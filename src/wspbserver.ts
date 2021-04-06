@@ -10,15 +10,13 @@ declare module 'ws' {
 }
 
 // BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
-type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
+export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
 
+/** parameters for WebSocket connecdtion */
 export interface  WSSOpts { domain: string, port: number, keydir: string, }
 
-const theGraid: WSSOpts = {
-	domain: ".thegraid.com",
-	port: 8443,
-	keydir: "/Users/jpeck/keys/"
-}
+/** a subset of https.ServerOptions */
+export type Credentials = https.ServerOptions // {key: string, cert: string}
 
 export interface WSOpts extends ws.ServerOptions {
 	host?: string, port?: number, backlog?: number,
@@ -32,6 +30,7 @@ export interface WSOpts extends ws.ServerOptions {
 	maxPayload?: number
 	binaryType?: BINARY_TYPES,
 }
+
 /** log each method with timeStamp. */
 export class CnxHandler {
 	ws: ws.WebSocket; // set by connection
@@ -72,11 +71,9 @@ export class EchoServer extends CnxHandler {
 	}
 }
 
-// a subset of https.ServerOptions
-export type Credentials = https.ServerOptions // {key: string, cert: string}
 /**
- * a Secure WebSocket Server (wss://)
- * listening and responding on wss://NAME.thegraid.com:PORT/
+ * a Secure WebSocket Listener (wss://)
+ * Listening for connections on the given wss://host.domain:port/ [secured by keydir] 
  */
 export class CnxManager {
 	basename: string = "localhost"
@@ -89,6 +86,23 @@ export class CnxManager {
 	credentials: Credentials
 	cnxType: typeof CnxHandler;
 	handler: CnxHandler;
+
+  /**
+   * 
+   * @param basename identifies the hostname and the key/cert alias
+   * @param wssOpts 
+   * @param cnxType 
+   */
+	constructor(basename: string, wssOpts: WSSOpts, cnxType: typeof CnxHandler = CnxHandler) {
+		let { domain, port, keydir } = wssOpts
+		this.port = port;
+		this.keydir = keydir;
+		this.keypath = this.keydir + basename + '.key.pem';
+		this.certpath = this.keydir + basename + '.cert.pem';
+		this.hostname = basename + domain;
+		this.credentials = this.getCredentials(this.keypath, this.certpath)
+		this.cnxType = cnxType
+	}
 	
 	run() {
 		this.dnsLookup(this.hostname, this.run_server)
@@ -105,17 +119,6 @@ export class CnxManager {
 		let privateKey = fs.readFileSync(this.keypath, 'utf8');
 		let certificate = fs.readFileSync(this.certpath, 'utf8');
 		return { key: privateKey, cert: certificate };
-	}
-
-	constructor(basename: string = "game7", wssOpts: WSSOpts, cnxType: typeof CnxHandler) {
-		let { domain, port, keydir } = wssOpts
-		this.port = port;
-		this.keydir = keydir;
-		this.keypath = this.keydir + basename + '.key.pem';
-		this.certpath = this.keydir + basename + '.cert.pem';
-		this.hostname = basename + domain;
-		this.credentials = this.getCredentials(this.keypath, this.certpath)
-		this.cnxType = cnxType
 	}
 
 	dumpobj = (name, obj) => {

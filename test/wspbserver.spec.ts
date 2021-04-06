@@ -1,4 +1,3 @@
-import { CnxHandler } from "../dist/out-tsc/wspbserver";
 import { CnxManager, WSSOpts, EchoServer } from "../src/wspbserver";
 
 
@@ -16,8 +15,12 @@ class TestEcho extends EchoServer {
   message(buf: Buffer, flags: any) {
     super.message(buf, flags)
     this.msgCount += 1
-    if (this.msgCount >= 3) 
-     TestCnxManager.doneFunc("count")
+    if (this.msgCount >= 3)
+      setTimeout(() => {
+        TestCnxManager.doneFunc("count")
+        setTimeout(() => process.exit(0), 300)
+        // would be nice to just terminate the '.on' listeners so process exit normally.
+      }, 500)
   }
   close() {
     super.close()
