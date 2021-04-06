@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "outDir": "dist/out-tsc",
+    "lib": ["es2018", "dom"],
+    "moduleResolution": "node",
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}
