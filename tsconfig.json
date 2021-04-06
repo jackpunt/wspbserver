@@ -3,7 +3,16 @@
     "outDir": "dist/out-tsc",
     "lib": ["es2018", "dom"],
     "moduleResolution": "node",
-    "sourceMap": true
+    "sourceMap": true,
+
+    // Tells TypeScript to read JS files, as
+    // normally they are ignored as source files
+    "allowJs": true,
+    // Generate d.ts files
+    "declaration": true,
+    // This compiler run should
+    // only output d.ts files
+    //"emitDeclarationOnly": true,
   },
   "include": [
     "src/**/*.ts"
