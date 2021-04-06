@@ -1,6 +1,6 @@
 {
   "name": "wspbserver",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "WebSocket Protobuf Server",
   "xmain": "dist/out-tsc/game-server.ts",
   "main": "dist/out-tsc/index.js",
