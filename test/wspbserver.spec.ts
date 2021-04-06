@@ -18,7 +18,7 @@ class TestEcho extends EchoServer {
     if (this.msgCount >= 3)
       setTimeout(() => {
         TestCnxManager.doneFunc("count")
-        setTimeout(() => process.exit(0), 300)
+        setTimeout(() => process.exit(2), 300)
         // would be nice to just terminate the '.on' listeners so process exit normally.
       }, 500)
   }
