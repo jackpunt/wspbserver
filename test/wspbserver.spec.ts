@@ -1,5 +1,5 @@
 import { CnxManager, WSSOpts, EchoServer } from "../src/wspbserver";
-
+const moment = require('moment');
 
 const theGraid: WSSOpts = {
 	domain: ".thegraid.com",
@@ -18,9 +18,9 @@ class TestEcho extends EchoServer {
     if (this.msgCount >= 3)
       setTimeout(() => {
         TestCnxManager.doneFunc("count")
-        setTimeout(() => process.exit(2), 300)
+        setTimeout(() => process.exit(2), 2000)
         // would be nice to just terminate the '.on' listeners so process exit normally.
-      }, 500)
+      }, 2000)
   }
   close() {
     super.close()
@@ -44,9 +44,11 @@ class TestCnxManager extends CnxManager {
 test("const", () => {
   expect(Object.entries(theGraid).length).toEqual(3);
 })
-console.log("game-server! ", new Date().toTimeString())
-test("wait", () => {
-  return new TestCnxManager("game7", theGraid, TestEcho).runOnce().then(data=>{
-    expect(data).toBe("count")
-  })
+const fmt = "YYYY-MM-DD kk:mm:ss.SS"
+
+console.log("TestCnxManager! ", moment().format(fmt))
+test("wait", async () => {
+  // "await" appends: .then((data) => {expect(data)...})
+  const data = await new TestCnxManager("game7", theGraid, TestEcho).runOnce();
+  expect(data).toBe("count");
 }, 30000)

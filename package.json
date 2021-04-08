@@ -15,7 +15,6 @@
     "type": "git",
     "url": "git+https://github.com/jackpunt/wspbserver.git"
   },
-
   "keywords": [
     "websocket",
     "protobuf",
@@ -30,6 +29,7 @@
   "dependencies": {
     "@types/ws": "^7.4.1",
     "google-protobuf": "*",
+    "moment": "^2.29.1",
     "tslib": "^2.1.0",
     "ws": "^7.4.4"
   },

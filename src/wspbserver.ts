@@ -2,7 +2,8 @@ import * as fs from "fs";
 import * as https from "https";
 import * as http from "http";
 import * as dns from "dns";
-import * as ws from "ws"
+import * as ws from "ws";
+import * as moment from 'moment';
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
 declare module 'ws' {
@@ -32,7 +33,7 @@ export interface WSOpts extends ws.ServerOptions {
 }
 
 export type CnxFactory = (ws: ws.WebSocket) => CnxHandler;
-
+const fmt = "YYYY-MM-DD kk:mm:ss.SS"
 /** 
  * log each method with timeStamp.
  * looks like gammaNg.wsConnect interface MsgParser
@@ -45,19 +46,20 @@ export class CnxHandler {
 	}
 
 	error(e: Error) {
-		console.log('%s error: %s', new Date(), e.message);
+		console.log('%s error: %s', moment().format(fmt), e.message);
 	}
 	open() {
-		console.log('%s open', new Date().toTimeString());
+		console.log('%s open', moment().format(fmt));
 	}
   message(buf: Buffer, flags) {
     // message appears to be a 'Buffer'
-    console.log("%s RECEIVED:", new Date().toTimeString(), { buf, flags })
+    
+    console.log("%s RECEIVED:", moment().format(fmt), { buf, flags })
     console.log("%s received: message.length= %s, flags= %s, flags.binary=%s",
-      new Date().toTimeString(), buf.length, flags, (flags && flags.binary));
+    moment().format(fmt), buf.length, flags, (flags && flags.binary));
   }
   close() {
-		console.log('%s disconnected', new Date());
+		console.log('%s disconnected', moment().format(fmt));
 	}
 }
 /** handle incoming() but sending back to this.ws */
@@ -67,9 +69,9 @@ export class EchoServer extends CnxHandler {
 		super.message(message, flags)
 		let ack = (error: Error) => {
 			if (!error) {
-				console.log('%s sent: %s', new Date().toTimeString(), "success");
+				console.log('%s sent: %s', moment().format(fmt), "success");
 			} else {
-				console.log('%s error: %s', new Date().toTimeString(), error);
+				console.log('%s error: %s', moment().format(fmt), error);
 			}
 		}
 		this.ws.send(message,  ack);
@@ -115,14 +117,15 @@ export class CnxManager {
   }
 	
 	run() {
-		this.dnsLookup(this.hostname, this.run_server)
+    //this.run_server(this.hostname, this.port)
+    this.dnsLookup(this.hostname, (addr,fam)=>{this.run_server(addr, this.port)})
 	}
-	dnsLookup(hostname: string, callback: (addr: string, fam: number) => void) {
+	/** https.Server.listen(host, port) does not require DNS addr */
+  dnsLookup(hostname: string, callback: (addr: string, fam: number) => void, thisArg: any = this) {
 		dns.lookup(hostname, (err, addr, fam) => {
-			console.log('rv=', { err: err, addr: addr, fam: fam });
-			console.log('rv.address=%s', addr);
+			console.log('rv=', { err, addr, fam });
 			if (err) console.log("Error", { code: err.code, error: err })
-			else callback(addr, this.port)
+			else callback.call(thisArg, addr, fam)
 		})
 	}
 	getCredentials(keypath: string, certpath: string): Credentials {
@@ -131,21 +134,12 @@ export class CnxManager {
 		return { key: privateKey, cert: certificate };
 	}
 
-	dumpobj = (name, obj) => {
-		console.log("dumping obj=" + name);
-		if (obj) {
-			for (let k in obj) {
-				console.log(name + "." + k + "=" + obj[k]);
-			}
-		}
-	};
-	baseOpts: WSOpts = {
+  baseOpts: WSOpts = {
 		binaryType: 'arraybuffer',
 		perMessageDeflate: false
 	}
 	wssUpgrade(httpsServer: https.Server, opts: WSOpts = this.baseOpts): ws.Server {
-		opts.server = httpsServer;
-		return new ws.Server(opts);
+		return new ws.Server(Object.assign({}, opts, {server: httpsServer}));
 	}
 	make_wss_server(host: string, port: number): ws.Server {
 		console.log('try listen on %s:%d', host, port);
@@ -153,7 +147,7 @@ export class CnxManager {
 		let httpsServer = https.createServer(this.credentials, undefined).listen(port, host);
 		console.log('listening on %s:%d', host, port);
 		const wss = this.wssUpgrade(httpsServer)
-		console.log('d: %s starting: wss=%s', new Date(), wss);
+		console.log('d: %s starting: wss=%s', moment().format(fmt), wss);
 		return wss;
 	}
   connection(ws: ws.WebSocket, req: http.IncomingMessage) {
@@ -170,11 +164,9 @@ export class CnxManager {
     // QQQQ: do we need to invoke: this.cnxHandler.open() ??
   }
 
-	run_server = (host: string, port: number) => {
+	run_server(host: string, port: number = this.port) {
 		let wss = this.make_wss_server(host, port)
-    let cnxmgr = this
 		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
-    // (socket: ws.WebSocket, req: http.IncomingMessage) => {this.connection.call(mgr, ws, req)}
 	}
 }
 

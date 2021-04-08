@@ -7,28 +7,8 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "Launch game-server",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/dist/out-tsc/game-server.js",
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "outFiles": [
-        "${workspaceFolder}/dist/out-tsc/**/*.js"
-      ]
-    },
-    {
-      "type": "pwa-node",
-      "request": "launch",
-      "name": "Launch index",
-      "skipFiles": [
-        "<node_internals>/**"
-      ],
-      "program": "${workspaceFolder}/dist/out-tsc/index.js",
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "outFiles": [
-        "${workspaceFolder}/dist/out-tsc/**/*.js"
-      ]
+      "name": "node echoserver.js",
+      "program": "${workspaceFolder}/dist/out-tsc/echoserver.js",
     },
   ]
 }
