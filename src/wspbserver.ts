@@ -31,7 +31,12 @@ export interface WSOpts extends ws.ServerOptions {
 	binaryType?: BINARY_TYPES,
 }
 
-/** log each method with timeStamp. */
+export type CnxFactory = (ws: ws.WebSocket) => CnxHandler;
+
+/** 
+ * log each method with timeStamp.
+ * looks like gammaNg.wsConnect interface MsgParser
+ */
 export class CnxHandler {
 	ws: ws.WebSocket; // set by connection
 
@@ -45,13 +50,13 @@ export class CnxHandler {
 	open() {
 		console.log('%s open', new Date().toTimeString());
 	}
-	message(message: Buffer, flags) {
-		// message appears to be a 'Buffer'
-		console.log("%s RECEIVED:", new Date().toTimeString(), {message, flags})
-		console.log("%s received: message.length= %s, flags= %s, flags.binary=%s",
-			new Date().toTimeString(), message.length, flags, (flags && flags.binary));
-	}
-	close() {
+  message(buf: Buffer, flags) {
+    // message appears to be a 'Buffer'
+    console.log("%s RECEIVED:", new Date().toTimeString(), { buf, flags })
+    console.log("%s received: message.length= %s, flags= %s, flags.binary=%s",
+      new Date().toTimeString(), buf.length, flags, (flags && flags.binary));
+  }
+  close() {
 		console.log('%s disconnected', new Date());
 	}
 }
@@ -74,6 +79,7 @@ export class EchoServer extends CnxHandler {
 /**
  * a Secure WebSocket Listener (wss://)
  * Listening for connections on the given wss://host.domain:port/ [secured by keydir] 
+ * 
  */
 export class CnxManager {
 	basename: string = "localhost"
@@ -84,25 +90,29 @@ export class CnxManager {
 	keypath: string = this.keydir + this.basename + '.key.pem'
 	certpath: string = this.keydir + this.basename + '.cert.pem'
 	credentials: Credentials
-	cnxType: typeof CnxHandler;
-	handler: CnxHandler;
+	cnxFactory: CnxFactory;
+	cnxHandler: CnxHandler;
 
   /**
    * 
    * @param basename identifies the hostname and the key/cert alias
    * @param wssOpts 
-   * @param cnxType 
+   * @param cnxFactory invokes new cnxType(ws)
    */
-	constructor(basename: string, wssOpts: WSSOpts, cnxType: typeof CnxHandler = CnxHandler) {
-		let { domain, port, keydir } = wssOpts
-		this.port = port;
-		this.keydir = keydir;
-		this.keypath = this.keydir + basename + '.key.pem';
-		this.certpath = this.keydir + basename + '.cert.pem';
-		this.hostname = basename + domain;
-		this.credentials = this.getCredentials(this.keypath, this.certpath)
-		this.cnxType = cnxType
-	}
+  constructor(basename: string, wssOpts: WSSOpts, cnxFactory: CnxFactory | typeof CnxHandler) {
+    let { domain, port, keydir } = wssOpts
+    this.port = port;
+    this.keydir = keydir;
+    this.keypath = this.keydir + basename + '.key.pem';
+    this.certpath = this.keydir + basename + '.cert.pem';
+    this.hostname = basename + domain;
+    this.credentials = this.getCredentials(this.keypath, this.certpath)
+
+    let cnxHandler = (cnxFactory as typeof CnxHandler)
+    this.cnxFactory = cnxFactory.name === undefined // cannot set [readonly name] on a (ws)=>{...} function
+      ? cnxFactory as CnxFactory
+      : (ws) => new cnxHandler(ws)
+  }
 	
 	run() {
 		this.dnsLookup(this.hostname, this.run_server)
@@ -146,15 +156,19 @@ export class CnxManager {
 		console.log('d: %s starting: wss=%s', new Date(), wss);
 		return wss;
 	}
-	connection(ws: ws.WebSocket, req: http.IncomingMessage) {
-  		let remote_addr: string = req.socket.remoteAddress
-			this.handler = new this.cnxType(ws)
+  connection(ws: ws.WebSocket, req: http.IncomingMessage) {
+    let remote_addr: string = req.socket.remoteAddress
+    let remote_port: number = req.socket.remotePort
+    let remote_family: string = req.socket.remoteFamily
+    let remote = {addr: req.socket.remoteAddress, port: req.socket.remotePort, family: req.socket.remoteFamily}
+    this.cnxHandler = this.cnxFactory(ws)
 
-      ws.on('open', () => this.handler.open());
-			ws.on('message', (buf: Buffer, flags: any) => this.handler.message(buf, flags));
-			ws.on('error', (e: Error) => this.handler.error(e));
-			ws.on('close', () => this.handler.close());
-		}
+    ws.on('open', () => this.cnxHandler.open());
+    ws.on('message', (buf: Buffer, flags: any) => this.cnxHandler.message(buf, flags));
+    ws.on('error', (e: Error) => this.cnxHandler.error(e));
+    ws.on('close', () => this.cnxHandler.close());
+    // QQQQ: do we need to invoke: this.cnxHandler.open() ??
+  }
 
 	run_server = (host: string, port: number) => {
 		let wss = this.make_wss_server(host, port)
