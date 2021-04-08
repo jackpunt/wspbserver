@@ -97,9 +97,10 @@ export class CnxManager {
    * 
    * @param basename identifies the hostname and the key/cert alias
    * @param wssOpts 
-   * @param cnxFactory invokes new cnxType(ws)
+   * @param cnxHanlder a class of CnxHandler: new cnxHanlder(ws)
+   * @param cnxFactory (ws) => CnxHandler; must supply cnxHandler == undefined
    */
-  constructor(basename: string, wssOpts: WSSOpts, cnxFactory: CnxFactory | typeof CnxHandler) {
+  constructor(basename: string, wssOpts: WSSOpts, cnxHandler: typeof CnxHandler, cnxFactory?: CnxFactory ) {
     let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
@@ -108,10 +109,9 @@ export class CnxManager {
     this.hostname = basename + domain;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
 
-    let cnxHandler = (cnxFactory as typeof CnxHandler)
-    this.cnxFactory = cnxFactory.name === undefined // cannot set [readonly name] on a (ws)=>{...} function
-      ? cnxFactory as CnxFactory
-      : (ws) => new cnxHandler(ws)
+    this.cnxFactory = (cnxHandler !== undefined)
+      ? (ws) => new cnxHandler(ws)
+      : cnxFactory as CnxFactory
   }
 	
 	run() {
