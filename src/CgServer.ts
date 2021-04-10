@@ -18,7 +18,7 @@ export class CgMessageHandler extends CnxHandler {
   isReferee(message: CgMessage): boolean {
     return (message.client_id === 0 && message.cause === "referee")
   }
-  message(buf: Buffer, flags): void {
+  wsmessage(buf: Buffer): void {
     let message = CgMessage.deserializeBinary(buf) as CgMessage
     if (message.type != CGmsg.join && this.group[message.client_id] != this) {
       console.log("ignore message from non-member")

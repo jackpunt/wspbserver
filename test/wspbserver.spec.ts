@@ -1,4 +1,5 @@
-import { CnxManager, WSSOpts, EchoServer } from "../src/wspbserver";
+import { CnxManager, WSSOpts } from "../src/wspbserver";
+import { EchoServer } from "../src/echoserver";
 const moment = require('moment');
 
 const theGraid: WSSOpts = {
@@ -8,12 +9,12 @@ const theGraid: WSSOpts = {
 }
 class TestEcho extends EchoServer {
   msgCount: number = 0;
-  error(reason: any) {
-    super.error(reason)
+  onerror(reason: Event) {
+    super.onerror(reason)
     TestCnxManager.errorFunc(reason)
   }
-  message(buf: Buffer, flags: any) {
-    super.message(buf, flags)
+  wsmessage(buf: Buffer) {
+    super.wsmessage(buf)
     this.msgCount += 1
     if (this.msgCount >= 3)
       setTimeout(() => {
@@ -22,8 +23,8 @@ class TestEcho extends EchoServer {
         // would be nice to just terminate the '.on' listeners so process exit normally.
       }, 2000)
   }
-  close() {
-    super.close()
+  onclose(ev: Event) {
+    super.onclose(ev)
     TestCnxManager.doneFunc("closed")
   }
 }

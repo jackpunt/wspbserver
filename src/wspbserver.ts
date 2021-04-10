@@ -33,49 +33,52 @@ export interface WSOpts extends ws.ServerOptions {
 }
 
 export type CnxFactory = (ws: ws.WebSocket) => CnxHandler;
-const fmt = "YYYY-MM-DD kk:mm:ss.SS"
-/** 
+export const fmt = "YYYY-MM-DD kk:mm:ss.SS"
+
+/** standard WebSocket events, for client (& server?) */
+interface WebSocketEventHandler {
+	onopen?: (ev: Event) => void | null;
+	onerror?: (ev: Event) => void | null;
+	onclose?: (ev: CloseEvent) => void | null;
+	onmessage: (ev: MessageEvent) => void | null;
+}
+/** node ws.WebSocket events, for server */
+interface WsServerEventHandler {
+	onopen?: (ev: Event) => void | null;
+	onerror?: (ev: Event) => void | null;
+	onclose?: (ev: CloseEvent) => void | null;
+	wsmessage: ((buf: Buffer, flags) => any) | null;
+}
+interface ProtobufMessageHandler {
+
+}
+/**
  * log each method with timeStamp.
- * looks like gammaNg.wsConnect interface MsgParser
+ * Similar to gammaNg.wsConnect interface MsgParser
+ * see also: WebSocketEventMap, <K extends keyof WebSocketEventMap>
  */
-export class CnxHandler {
+export class CnxHandler implements WsServerEventHandler {
 	ws: ws.WebSocket; // set by connection
 
 	constructor(ws: ws.WebSocket) {
 		this.ws = ws
 	}
 
-	error(e: Error) {
-		console.log('%s error: %s', moment().format(fmt), e.message);
+	onopen(ev: Event) {
+		console.log('%s open:', moment().format(fmt), ev);
 	}
-	open() {
-		console.log('%s open', moment().format(fmt));
+  onclose(ev: Event) {
+		console.log('%s disconnected', moment().format(fmt), ev);
 	}
-  message(buf: Buffer, flags) {
+	onerror(ev: Event) {
+		console.log('%s error:', moment().format(fmt), ev);
+	}
+  wsmessage(buf: Buffer) {
     // message appears to be a 'Buffer'
     
-    console.log("%s RECEIVED:", moment().format(fmt), { buf, flags })
-    console.log("%s received: message.length= %s, flags= %s, flags.binary=%s",
-    moment().format(fmt), buf.length, flags, (flags && flags.binary));
+    console.log("%s RECEIVED:", moment().format(fmt), buf)
+    console.log("%s received: message.length= %s", moment().format(fmt), buf.length);
   }
-  close() {
-		console.log('%s disconnected', moment().format(fmt));
-	}
-}
-/** handle incoming() but sending back to this.ws */
-export class EchoServer extends CnxHandler {
-	// message appears to be a 'Buffer'
-	message(message: Buffer, flags) {
-		super.message(message, flags)
-		let ack = (error: Error) => {
-			if (!error) {
-				console.log('%s sent: %s', moment().format(fmt), "success");
-			} else {
-				console.log('%s error: %s', moment().format(fmt), error);
-			}
-		}
-		this.ws.send(message,  ack);
-	}
 }
 
 /**
@@ -117,8 +120,8 @@ export class CnxManager {
   }
 	
 	run() {
-    //this.run_server(this.hostname, this.port)
-    this.dnsLookup(this.hostname, (addr,fam)=>{this.run_server(addr, this.port)})
+    this.run_server(this.hostname, this.port)
+    //this.dnsLookup(this.hostname, (addr,fam)=>{this.run_server(addr, this.port)})
 	}
 	/** https.Server.listen(host, port) does not require DNS addr */
   dnsLookup(hostname: string, callback: (addr: string, fam: number) => void, thisArg: any = this) {
@@ -157,10 +160,10 @@ export class CnxManager {
     let remote = {addr: req.socket.remoteAddress, port: req.socket.remotePort, family: req.socket.remoteFamily}
     this.cnxHandler = this.cnxFactory(ws)
 
-    ws.on('open', () => this.cnxHandler.open());
-    ws.on('message', (buf: Buffer, flags: any) => this.cnxHandler.message(buf, flags));
-    ws.on('error', (e: Error) => this.cnxHandler.error(e));
-    ws.on('close', () => this.cnxHandler.close());
+    ws.on('open', (ev: Event) => this.cnxHandler.onopen(ev));
+    ws.on('message', (buf: Buffer) => this.cnxHandler.wsmessage(buf));
+    ws.on('error', (ev: Event) => this.cnxHandler.onerror(ev));
+    ws.on('close', (ev: Event) => this.cnxHandler.onclose(ev));
     // QQQQ: do we need to invoke: this.cnxHandler.open() ??
   }
 
