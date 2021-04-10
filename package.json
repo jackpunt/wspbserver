@@ -8,8 +8,10 @@
   ],
   "scripts": {
     "proto": "protoc -I src/proto --ts_out=library=client-group,binary:src src/proto/client-group.proto",
-    "build": "tsc",
-    "test": "jest --runInBand --force-exit --detectOpenHandles"
+    "test": "jest --runInBand --force-exit --detectOpenHandles",
+    "tsc": "tsc",
+    "clean": "rm -f dist/out-tsc",
+    "build": "npm run clean; npm run tsc"
   },
   "repository": {
     "type": "git",
