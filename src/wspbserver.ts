@@ -47,7 +47,7 @@ interface WsServerEventHandler {
 	onopen?: (ev: Event) => void | null;
 	onerror?: (ev: Event) => void | null;
 	onclose?: (ev: CloseEvent) => void | null;
-	wsmessage: ((buf: Buffer, flags) => any) | null;
+	wsmessage: (buf: Buffer) => void | null;
 }
 interface ProtobufMessageHandler {
 
