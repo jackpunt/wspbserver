@@ -47,7 +47,7 @@ class TestEcho extends EchoServer {
   countP: PromiseTriad<number> = new PromiseTriad<number>()
   getMsgs(count: number): PromiseTriad<number> {
     let countP = new PromiseTriad<number>()
-    setTimeout(() => { countP.rej("timeout") }, 500) // No-op if promise already fulfilled
+    setTimeout(() => { countP.rej("timeout") }, 500 + count*50) // No-op if promise already fulfilled
     return this.countP = countP
   }
 }
@@ -91,14 +91,15 @@ test("connection", cnx_done => {
 
 var msg_test_p = new PromiseTriad<string>()
 test("message received", msg_done => {
+  let count = 3
   pserver.promise.then(() => {
     pcnxt.promise.then(() => {
-      cnx.getMsgs(1).promise.then((data) => {
+      cnx.getMsgs(count).promise.then((data) => {
         expect(data).toBe(0)
       }).catch((reason) => {
         expect(reason).toBe("closed")
       }).finally(() => {
-        console.log("message received!")
+        console.log("received %s messages!", count)
         msg_test_p.res("message recieved")
         msg_done()
       })
