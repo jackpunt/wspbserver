@@ -1,6 +1,7 @@
+import { Server } from "node:http";
 import { CgBaseCnx } from "./CgBase";
 import { CgMessage, CgType } from "./CgProto";
-import { CnxHandler, pbMessage } from "./wspbserver";
+import { pbMessage } from "./wspbserver";
 
 class Group extends Array<CgServerCnx> {
   aname: string;
@@ -64,13 +65,13 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
         this.sendToSocket(req)
         this.nak_count != 1;
       } else {
-        // if resend_count > N {this.promise.reject("many NAKs")}
+        // if resend_count > N {this.promise.reject(new Error("many NAKs"))}
         // if resend_count > N {this.close/leave/robot}
 
       }
     }
   }
-  /** only on server */
+  /** on server: add to group */
   eval_join(message: CgMessage): void {
     if (this.group_name !== undefined) {
       this.sendNak("already in group", this.group_name)
@@ -83,7 +84,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
       group.aname = message.cause; // for ease of debug reference
       console.log("CgServer.eval_join: new Group", group)
       CgServerCnx.groups[join_name] = group
-      group[0] = new CgServerCnx(undefined) // TODO: spawn a referee, let it connect
+      group[0] = new CgAutoAckCnx(this) // TODO: spawn a referee, let it connect
     }
     this.group_name = join_name
     let client_id = this.isFromReferee(message) ? 0 : group.length
@@ -128,16 +129,15 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
     return promises
   }
   sendToReferee(msg: CgMessage): Promise<CgMessage> {
-    if (this.group[0] instanceof CgServerCnx)
-      return this.group[0].sendToSocket(msg)
-    else 
-      return new Promise<CgMessage>((res, rej) => { 
-        let ack = new CgMessage({type: CgType.ack, success: true, cause: "auto-approve"})
-        res(ack)
-      })
+    // use auto-ref until there is a better connection.
+    if (!(this.group[0] instanceof CgServerCnx)) {
+      this.group[0] = new CgAutoAckCnx(this)
+    }
+    return this.group[0].sendToSocket(msg)
   }
 
   sendToGroup(message: CgMessage, on_ack?: (pa: CgMessage[]) => void, on_rej?: (pa: CgMessage[]) => void, on_fin?: () => void) {
+    // on_ack & on_rej 'default' to: idenity(val) => val
     // first send to referee,
     // if ack-success, then send to rest of group
     // if ack-fail, then sendNak(ack.cause)
@@ -147,12 +147,31 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
       if (ack.success) {
         // forward original message to rest of group
         let promises = this.sendToMembers(message)
-        Promise.all(promises).then(on_ack).catch(on_rej).finally(on_fin)
+        let alldone = Promise.all(promises)
+        alldone.then(on_ack, on_rej).finally(on_fin) // ignore any throw()
       } else {
         this.sendNak(ack.cause)  // "illegal move"
       }
     }).catch((reason: string) => {
       this.sendNak(reason) // "network or application failed"
     })
+  }
+}
+
+/** in-process "connection" that immediately Acks any message that needs it. */
+class CgAutoAckCnx extends CgServerCnx {
+  constructor(public server: CgServerCnx) {
+    super(null, null) // no websocket, no inner_msg_handler
+  }
+  /** don't actually send anything.
+   * return a Promise<Ack> that is resolved.
+   */
+  sendToSocket(message: CgMessage): Promise<CgMessage> {
+    if (CgServerCnx.msgsToAck.includes(message.type)) {
+      let ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
+      return Promise.resolve(ack)
+    } else {
+      return null; // ignore other [ack, none] messages; nobody expects a Promise<CgMessage> from them.
+    }
   }
 }

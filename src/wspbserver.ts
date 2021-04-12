@@ -16,11 +16,22 @@ export interface pbMessage extends jspb.Message {}
 // BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
 export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
 
+/** 
+ * websocket close codes.
+ * 
+ * https://docs.microsoft.com/en-us/dotnet/api/system.net.websockets.websocketclosestatus 
+ */
+export enum CLOSE_CODE { NormalCLosure = 1000, EndpointUnavailable = 1001, Empty = 1005 }
+
 /** parameters for WebSocket Secure Listener */
 export interface  WSSOpts { domain: string, port: number, keydir: string, }
 
 /** a subset of https.ServerOptions */
 export type Credentials = https.ServerOptions // {key: string, cert: string}
+export type EitherWebSocket = WebSocket | ws.WebSocket
+export type DataBuf = Buffer | Uint8Array
+export type CnxFactory = (ws: EitherWebSocket) => CnxHandler<pbMessage>;
+export const fmt = "YYYY-MM-DD kk:mm:ss.SS"
 
 export interface WsServerOptions extends ws.ServerOptions {
 	host?: string, port?: number, 
@@ -36,34 +47,17 @@ export interface WsServerOptions extends ws.ServerOptions {
 	binaryType?: BINARY_TYPES,
 }
 
-export	type eitherWebSocket = WebSocket | ws.WebSocket
-export type CnxFactory = (ws: eitherWebSocket) => CnxHandler<pbMessage>;
-export const fmt = "YYYY-MM-DD kk:mm:ss.SS"
-
-/** standard HTML [Web]Socket events, for client (& server?) */
+/** standard HTML [Web]Socket events, for client (& server ws.WebSocket) */
 export interface WebSocketEventHandler {
-	onopen?: (ev: Event) => void | null;  // { target: WebSocket }
-	onerror?: (ev: Event) => void | null; // { target: WebSocket, error: any, message: any, type: string }
-	onclose?: (ev: CloseEvent) => void | null; // { target: WebSocket, wasClean: boolean, code: number, reason: string; }
+	onopen: (ev: Event) => void | null;  // { target: WebSocket }
+	onerror: (ev: Event) => void | null; // { target: WebSocket, error: any, message: any, type: string }
+	onclose: (ev: CloseEvent) => void | null; // { target: WebSocket, wasClean: boolean, code: number, reason: string; }
 	onmessage: (ev: MessageEvent) => void | null; // { target: WebSocket, data: any, type: string }
+	wsmessage: (buf: DataBuf) => void | null; // from ws.WebSocket Node.js server (buf: {any[] | Buffer })
 }
 
-interface wsCallbacks {
-	onopen: (event: ws.OpenEvent) => void;
-	onerror: (event: ws.ErrorEvent) => void;
-	onclose: (event: ws.CloseEvent) => void;
-	onmessage: (event: ws.MessageEvent) => void;
-}
-/** node ws.WebSocket events, for server */
-export interface WsServerEventHandler {
-	onopen?: (ev: Event) => void | null;
-	onerror?: (ev: Event) => void | null;
-	onclose?: (ev: CloseEvent) => void | null;
-	wsmessage: (buf: Buffer | Uint8Array) => void | null; // (buf: {any[] | Buffer | ArrayBuffer })
-}
-export interface PbMessageHandler<T extends pbMessage> {
-	deserialize(bytes: Buffer | Uint8Array): T;
-	serialize(message:T): Buffer | Uint8Array;
+export interface PbParser<T extends pbMessage> {
+	deserialize(bytes: DataBuf): T
 	parseEval(message:T): void;
 }
 /**
@@ -71,31 +65,55 @@ export interface PbMessageHandler<T extends pbMessage> {
  * Similar to gammaNg.wsConnect interface MsgParser
  * see also: WebSocketEventMap, <K extends keyof WebSocketEventMap>
  */
-export class CnxHandler<T extends pbMessage> implements WsServerEventHandler {
-	ws: eitherWebSocket; // set by connection
-	msg_handler: PbMessageHandler<T>;
+export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, PbParser<T> {
+	/** The underlying Socket to send/receive bytes. */
+	ws: EitherWebSocket; // set by connection
+  /** in principal, one could inject an alternative msg_handler... */
+  msg_handler: PbParser<T>;
+
+	/**
+	 * Send & Recieve [protobuf] messages over a WebSocket.
+	 * 
+	 * @param ws the WebSocket or ws.WebSocket being serviced
+	 * @param msg_handler optional override PbMessage handler; default: 'this'
+	 */
+	constructor(ws: EitherWebSocket, msg_handler?: PbParser<T>) {
+		this.ws = ws
+		this.msg_handler = msg_handler || this
+	}
+
+	/** 
+	 * Extract pbMessage<T> from bytes.
+	 * Typically, invoke static T.deserializeBinary(bytes)
+	 * 
+	 * deserialize(bytes: Default) { return T.deserializeBinary(bytes) }
+	 */
+	deserialize(bytes: DataBuf): T {
+		// return T.deserializeBinary(bytes)
+		throw new Error("Method not implemented: 'deserialize'");
+	}
+	/** take action based on the received pbMessage. */
+  parseEval(message: T): void {
+		throw new Error("Method not implemented: 'pareseEval'");
+	}
 
 	sendError: (error: Event) => void;
 
-	serialize(message: pbMessage): Uint8Array {
-		let writer = new jspb.BinaryWriter();
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-call,@typescript-eslint/dot-notation
-		message["serialize"](writer)
-		return writer.getResultBuffer()
-	}
-	sendBuffer(data: Buffer | Uint8Array, cb?: (error: Event | Error) => void) {
-		if (this.ws instanceof WebSocket) {
+	/**
+	 * 
+	 * @param data DataBuf to be sent
+	 * @param cb provide specific function for 'onerror'
+	 */
+	sendBuffer(data: DataBuf, cb?: (error: Event | Error) => void) {
+		if (this.ws instanceof ws.EventEmitter) {
+			this.ws.send(data, undefined, cb)
+		} else {
 			this.sendError = cb
 			this.ws.send(data)
-		} else {
-			this.ws.send(data, undefined, cb)
 		}
 	}
 
-	constructor(ws: eitherWebSocket) {
-		this.ws = ws
-	}
-	// Basically abstract methods:
+// Basically abstract methods:
 
 	onopen(ev: Event) {
 		console.log('%s open:', moment().format(fmt), ev);
@@ -108,16 +126,17 @@ export class CnxHandler<T extends pbMessage> implements WsServerEventHandler {
 		if (typeof(this.sendError) === 'function')
 		  this.sendBuffer.call(this, ev)
 	}
-	/** received a message<T> from eitherWebSocket */
-	onmessage(msg: MessageEvent | Buffer | Uint8Array) {
+	/** received a message<T> from EitherWebSocket */
+	onmessage(msg: MessageEvent | DataBuf) {
 		let data = (msg instanceof MessageEvent) ? msg.data : msg
 		this.wsmessage(data)
 	}
-	/** received a ArrayBuffer<T> from WebSocket or ws.WebSocket */
-  wsmessage(buf: Buffer | Uint8Array) {
-    console.log("%s RECEIVED:", moment().format(fmt), buf.length, buf)
-		let msg = this.msg_handler.deserialize(buf)
-		this.msg_handler.parseEval(msg)
+	/** received a DataBuf<T> from ws.WebSocket or MessageEvent */
+	wsmessage(buf: DataBuf) {
+		if (!!this.msg_handler) {
+			let msg = this.msg_handler.deserialize(buf)
+			this.msg_handler.parseEval(msg)
+		}
 	}
 }
 
@@ -137,7 +156,7 @@ export class CnxManager {
 	credentials: Credentials
 	cnxFactory: CnxFactory;
 	cnxHandler: CnxHandler<pbMessage>;
-
+	wss: ws.Server
   /**
    * 
    * @param basename identifies the hostname and the key/cert alias
@@ -145,7 +164,7 @@ export class CnxManager {
    * @param cnxHanlder a class of CnxHandler: new cnxHanlder(ws)
    * @param cnxFactory (ws) => CnxHandler; must supply cnxHandler == undefined
    */
-  constructor(basename: string, wssOpts: WSSOpts, cnxHandler: typeof CnxHandler, cnxFactory?: CnxFactory ) {
+  constructor(basename: string, wssOpts: WSSOpts, cnxFactory: CnxFactory ) {
     let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
@@ -154,9 +173,7 @@ export class CnxManager {
     this.hostname = basename + domain;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
 
-    this.cnxFactory = (cnxHandler !== undefined)
-      ? (ws) => new cnxHandler(ws)
-      : cnxFactory as CnxFactory
+    this.cnxFactory = cnxFactory
   }
 	
 	run() {
@@ -193,6 +210,7 @@ export class CnxManager {
 		console.log('d: %s starting: wss=%s', moment().format(fmt), wss);
 		return wss;
 	}
+	/** All server-listeners or on Node.js, using ws.WebSocket. */
   connection(ws: ws.WebSocket, req: http.IncomingMessage) {
     let remote_addr: string = req.socket.remoteAddress
     let remote_port: number = req.socket.remotePort
@@ -203,13 +221,13 @@ export class CnxManager {
     ws.on('open', (ev: Event) => this.cnxHandler.onopen(ev));
     ws.on('close', (ev: Event) => this.cnxHandler.onclose(ev));
     ws.on('error', (ev: Event) => this.cnxHandler.onerror(ev));
-    ws.on('message', (buf: Buffer) => this.cnxHandler.wsmessage(buf));
+    ws.on('message', (buf: DataBuf) => this.cnxHandler.wsmessage(buf));
     // QQQQ: do we need to invoke: this.cnxHandler.open() ??
   }
 
 	run_server(host: string, port: number = this.port) {
-		let wss = this.make_wss_server(host, port)
-		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
+		this.wss = this.make_wss_server(host, port)
+		this.wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
 	}
 }
 

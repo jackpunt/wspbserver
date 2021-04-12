@@ -1,10 +1,15 @@
 import * as moment from "moment";
-import { CnxHandler, fmt, pbMessage } from "./wspbserver"
+import { CnxHandler, DataBuf, fmt, pbMessage } from "./wspbserver"
 
-/** handle incoming() but sending back to this.ws */
+/** A CnxHandler that handles incoming(buf) by sending it back to this.ws */
 export class EchoServer extends CnxHandler<pbMessage> {
-	wsmessage(buf: Buffer | Uint8Array) {
-		super.wsmessage(buf) // log reception
+	/**
+	 * Override to avoid deserialize, parseEval
+	 * @param buf 
+	 * @override
+	 */
+	wsmessage(buf: DataBuf) {
+		console.log("%s RECEIVED:", moment().format(fmt), buf.length, buf)
 		let ack = (error: Error) => {
 			if (!error) {
 				console.log('%s sent: %s', moment().format(fmt), "success");
