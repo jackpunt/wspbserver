@@ -1,5 +1,5 @@
 import * as pb_1 from "google-protobuf";
-export enum CGmsg {
+export enum CgType {
     none = 0,
     ack = 1,
     send = 2,
@@ -8,7 +8,7 @@ export enum CGmsg {
 }
 export class CgMessage extends pb_1.Message {
     constructor(data?: any[] | {
-        type?: CGmsg;
+        type?: CgType;
         client_id?: number;
         success?: boolean;
         msg?: Uint8Array;
@@ -26,10 +26,10 @@ export class CgMessage extends pb_1.Message {
             this.cause = data.cause;
         }
     }
-    get type(): CGmsg {
-        return pb_1.Message.getFieldWithDefault(this, 1, undefined) as CGmsg;
+    get type(): CgType {
+        return pb_1.Message.getFieldWithDefault(this, 1, undefined) as CgType;
     }
-    set type(value: CGmsg) {
+    set type(value: CgType) {
         pb_1.Message.setField(this, 1, value);
     }
     get client_id(): number {

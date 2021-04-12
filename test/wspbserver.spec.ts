@@ -50,6 +50,6 @@ const fmt = "YYYY-MM-DD kk:mm:ss.SS"
 console.log("TestCnxManager! ", moment().format(fmt))
 test("wait", async () => {
   // "await" appends: .then((data) => {expect(data)...})
-  const data = await new TestCnxManager("game7", theGraid, TestEcho).runOnce();
+  const data = await new TestCnxManager("game7", theGraid, undefined, (ws)=>new TestEcho(ws)).runOnce();
   expect(data).toBe("count");
 }, 30000)

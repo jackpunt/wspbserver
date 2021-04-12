@@ -1,11 +1,10 @@
 import * as moment from "moment";
-import { WSSOpts, CnxManager, CnxHandler, fmt } from "./wspbserver"
+import { CnxHandler, fmt, pbMessage } from "./wspbserver"
 
 /** handle incoming() but sending back to this.ws */
-export class EchoServer extends CnxHandler {
-	// message appears to be a 'Buffer'
-	wsmessage(message: Buffer) {
-		super.wsmessage(message)
+export class EchoServer extends CnxHandler<pbMessage> {
+	wsmessage(buf: Buffer | Uint8Array) {
+		super.wsmessage(buf) // log reception
 		let ack = (error: Error) => {
 			if (!error) {
 				console.log('%s sent: %s', moment().format(fmt), "success");
@@ -13,7 +12,7 @@ export class EchoServer extends CnxHandler {
 				console.log('%s error: %s', moment().format(fmt), error);
 			}
 		}
-		this.ws.send(message,  ack);
+		this.sendBuffer(buf,  ack);
 	}
 }
 

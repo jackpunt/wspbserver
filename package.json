@@ -7,10 +7,11 @@
     "dist/out-tsc"
   ],
   "scripts": {
-    "proto": "protoc -I src/proto --ts_out=library=client-group,binary:src src/proto/client-group.proto",
+    "protojs": "protoc -I src/proto --js_out=import_style=commonjs,binary:. src/proto/*.proto",
+    "protots": "protoc -I src/proto --ts_out=src src/proto/*.proto",
     "test": "jest --runInBand --force-exit --detectOpenHandles",
     "tsc": "tsc",
-    "clean": "rm -f dist/out-tsc",
+    "clean": "rm -f dist/out-tsc/*",
     "build": "npm run clean; npm run tsc"
   },
   "repository": {

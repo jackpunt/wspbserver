@@ -1,0 +1,19 @@
+syntax="proto3";
+
+/** identify the intent and contents of this message */
+enum CgType {
+  none = 0;
+  ack = 1;
+  send = 2;
+  join = 3;
+  leave = 4;
+}
+/** Group protocol and carry nested message to send. */
+message CgMessage {
+  CgType type = 1;       // indicates which fields are populated:
+  int32  client_id = 2;  // {leave, send, ack}; join responds with ack(client_id)
+  bool   success = 3;    // ack: true/false
+  bytes  msg = 4;        // send: nested protobuf
+  string group = 5;      // leave, join: "group-name"
+  string cause = 6;      // leave: "resign" | "robot"; ack: cause of !success; join: "client name"
+}
