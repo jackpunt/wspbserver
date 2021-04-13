@@ -7,22 +7,35 @@ import { CnxHandler, DataBuf, EitherWebSocket, pbMessage, PbParser } from "./wsp
 /**
  * Extends CnxHandler<pbMessage> to handle Client-Group proto messages.
  * Implements basic/common Client-Group messaging.
+ * 
  * Specialize for CgClient and CgServer; 
  * by overriding Cg methods: eval_join, eval_leave, eval_send, eval_ack
  * which are invoked when RECIEVING the named CgMessage.
  * 
+ * Default msg_handler:PbParser invokes: eval_join, eval_leave, eval_send, eval_ack on *this*
+ * 
  * Implement/override: join, leave, send, ack
  * Send a CgMessage with: sendToSocket(msg: CgMessage) or sendWrapped(msg: IN)
  */
-export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> implements PbParser<CgMessage> {
+export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> implements PbParser<CgMessage> {
   static msgsToAck = [CgType.send, CgType.join, CgType.leave]
 
-  constructor(ws: EitherWebSocket, msg_handler: PbParser<IN>) {
+  /**
+   * This instance is its own "msg_handler", handling CgProto.
+   * 
+   * eval_send(inner_message: InnerProto) invokes inner_msg_handler.parseEval(inner_message)
+   * 
+   * Supply a PbParser<INNER> to deserialize and parseEval the INNER messages.
+   * 
+   * @param ws 
+   * @param inner_msg_handler 
+   */
+  constructor(ws: EitherWebSocket, inner_msg_handler: PbParser<INNER>) {
     super(ws)
-    this.inner_msg_handler = msg_handler;
+    this.inner_msg_handler = inner_msg_handler;
   }
 
-  inner_msg_handler: PbParser<IN>
+  inner_msg_handler: PbParser<INNER>
 
   group_name: string;  // group to which this connection is join'd
   client_id: number;   // my client_id for this group.
@@ -42,6 +55,7 @@ export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> imple
    * @override
    */
   onerror(ev: Event) {
+    super.onerror(ev)    // maybe invoke sentError(ev)
     if (this.waiting_for_ack) {
       this.promise_reject(ev)
     }
@@ -67,7 +81,7 @@ export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> imple
    * send a [sub-protocol] message, wrapped in a CgMessage.
    * @return Promise that resolves to the Ack/Nak message
    */
-  sendWrapped(message: IN): Promise<CgMessage> {
+  sendWrapped(message: INNER): Promise<CgMessage> {
     let bytes = message.serializeBinary();
     let cgmsg: CgMessage = new CgMessage({ type: CgType.send, msg: bytes });
     return this.sendToSocket(cgmsg)

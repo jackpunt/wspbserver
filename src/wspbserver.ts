@@ -6,6 +6,13 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import * as jspb from 'google-protobuf';
 
+// this file is the Barrel:
+export * from "./CgProto"
+export * from "./CgBase"
+export * from "./CgClient"
+export * from "./CgServer"
+export * from "./EzPromise"
+
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
 declare module 'ws' {
   export interface WebSocket extends ws { }
@@ -64,6 +71,9 @@ export interface PbParser<T extends pbMessage> {
  * Simplest CnxHandler: just log each method with timeStamp.
  * Similar to gammaNg.wsConnect interface MsgParser
  * see also: WebSocketEventMap, <K extends keyof WebSocketEventMap>
+ * 
+ * Override with deserialize(bytes):T, parseEval(T) or supply other msg_handler: PbParser<T>
+ * Note: wsmessage(bytes) => parseEval(deserialize(bytes))
  */
 export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, PbParser<T> {
 	/** The underlying Socket to send/receive bytes. */
@@ -74,10 +84,20 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, P
 	/**
 	 * Send & Recieve [protobuf] messages over a WebSocket.
 	 * 
-	 * @param ws the WebSocket or ws.WebSocket being serviced
+	 * @param ws the ws.WebSocket (or WebSocket or url) connection to be handled.
 	 * @param msg_handler optional override PbMessage handler; default: 'this'
 	 */
-	constructor(ws: EitherWebSocket, msg_handler?: PbParser<T>) {
+	constructor(ws: EitherWebSocket | string, msg_handler?: PbParser<T>) {
+		if (typeof(ws) === 'string') {
+			let url = ws
+			ws = new WebSocket(url);      // TODO: handle failure of URL or connection
+			ws.binaryType = "arraybuffer" ;
+			// for outbound/browser client connections, use WebSocket interface directly:
+			if (this.onopen) ws.onopen = this.onopen;
+			if (this.onerror) ws.onerror = this.onerror;
+			if (this.onclose) ws.onclose = this.onclose;
+			if (this.onmessage) ws.onmessage = this.onmessage;
+		}
 		this.ws = ws
 		this.msg_handler = msg_handler || this
 	}
@@ -97,6 +117,7 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, P
 		throw new Error("Method not implemented: 'pareseEval'");
 	}
 
+	/** set and used for onerror, by/during sendBuffer */
 	sendError: (error: Event) => void;
 
 	/**
@@ -106,10 +127,12 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, P
 	 */
 	sendBuffer(data: DataBuf, cb?: (error: Event | Error) => void) {
 		if (this.ws instanceof ws.EventEmitter) {
-			this.ws.send(data, undefined, cb)
+			this.ws.send(data, undefined, cb) // server-side API
 		} else {
+			// try emulate on browser/client-side:
 			this.sendError = cb
 			this.ws.send(data)
+			this.sendError = undefined
 		}
 	}
 
@@ -133,10 +156,8 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, P
 	}
 	/** received a DataBuf<T> from ws.WebSocket or MessageEvent */
 	wsmessage(buf: DataBuf) {
-		if (!!this.msg_handler) {
-			let msg = this.msg_handler.deserialize(buf)
-			this.msg_handler.parseEval(msg)
-		}
+		let msg = this.msg_handler.deserialize(buf)
+		this.msg_handler.parseEval(msg)
 	}
 }
 
@@ -218,6 +239,7 @@ export class CnxListener {
     let remote = {addr: req.socket.remoteAddress, port: req.socket.remotePort, family: req.socket.remoteFamily}
     this.cnxHandler = this.cnxFactory(ws)
 
+		// for incoming/server connections, use ws.WebSocket interface:
     ws.on('open', (ev: Event) => this.cnxHandler.onopen(ev));
     ws.on('close', (ev: Event) => this.cnxHandler.onclose(ev));
     ws.on('error', (ev: Event) => this.cnxHandler.onerror(ev));

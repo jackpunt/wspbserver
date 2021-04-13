@@ -13,9 +13,10 @@
     "echo": "node dist/out-tsc/echoserver.js",
     "cgserve": "node dist/out-tsc/CgServer.js",
     "test": "jest --runInBand --force-exit --detectOpenHandles",
+    "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
-    "build": "npm run clean; npm run tsc"
+    "build": "npm run clean; npm run protots; npm run tsc"
   },
   "repository": {
     "type": "git",
