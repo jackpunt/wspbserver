@@ -145,7 +145,7 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, P
  * Listening for connections on the given wss://host.domain:port/ [secured by keydir] 
  * 
  */
-export class CnxManager {
+export class CnxListener {
 	basename: string = "localhost"
 	domain: string = ".local"
 	hostname: string = this.basename + this.domain
@@ -176,7 +176,7 @@ export class CnxManager {
     this.cnxFactory = cnxFactory
   }
 	
-	run() {
+	startListening() {
     this.run_server(this.hostname, this.port)
     //this.dnsLookup(this.hostname, (addr,fam)=>{this.run_server(addr, this.port)})
 	}
@@ -231,3 +231,22 @@ export class CnxManager {
 	}
 }
 
+/** A CnxHandler that handles incoming(buf) by sending it back to this.ws */
+export class EchoCnx extends CnxHandler<pbMessage> {
+	/**
+	 * Override to avoid deserialize, parseEval
+	 * @param buf 
+	 * @override
+	 */
+	wsmessage(buf: DataBuf) {
+		console.log("%s RECEIVED:", moment().format(fmt), buf.length, buf)
+		let ack = (error: Error) => {
+			if (!error) {
+				console.log('%s sent: %s', moment().format(fmt), "success");
+			} else {
+				console.log('%s error: %s', moment().format(fmt), error);
+			}
+		}
+		this.sendBuffer(buf,  ack);
+	}
+}

@@ -1,5 +1,4 @@
-import { CLOSE_CODE, CnxFactory, CnxHandler, CnxManager, EitherWebSocket, pbMessage, PbParser, WSSOpts } from "../src/wspbserver";
-import { EchoServer } from "../src/echoserver";
+import { CLOSE_CODE, CnxFactory, CnxHandler, CnxListener, EchoCnx, EitherWebSocket, pbMessage, PbParser, WSSOpts } from "../src/wspbserver";
 const moment = require('moment');
 
 const theGraid: WSSOpts = {
@@ -21,7 +20,7 @@ class PromiseTriad<T> {
 type CloseInfo = {code: number, reason: string}
 
 /** TestEcho has no deserialize, parseEval nor msg_handler */
-class TestEcho extends EchoServer {
+class TestEchoCnx extends EchoCnx {
   msgCount: number = 3;
 
   onerror(reason: Event) {
@@ -52,38 +51,35 @@ class TestEcho extends EchoServer {
   }
 }
 
-
-class TestCnxManager extends CnxManager {}
-
 const fmt = "YYYY-MM-DD kk:mm:ss.SS"
-console.log("TestCnxManager! ", moment().format(fmt))
+console.log("Start Test", moment().format(fmt))
 test("WSSOpts", () => {
   expect(Object.entries(theGraid).length).toEqual(3);
 })
 
-var pserver = new PromiseTriad<CnxManager>()
-var server: TestCnxManager;
+var pserver = new PromiseTriad<CnxListener>()
+var server: CnxListener;
 /** set when CnxHandler is created. */
 var pcnxt = new PromiseTriad<CnxHandler<pbMessage>>()
 
 var cnxFactory: CnxFactory = (ws: EitherWebSocket) => {
-  let cnxHandler = new TestEcho(ws, null) // creates cnxHander.closeP, .countP
+  let cnxHandler = new TestEchoCnx(ws, null) // creates cnxHander.closeP, .countP
   pcnxt.res(cnxHandler)
   return cnxHandler
 }
 test("make server", () => {
-    server = new TestCnxManager("game7", theGraid, cnxFactory)
-    expect(server).toBeInstanceOf(TestCnxManager)
-    server.run()
+    server = new CnxListener("game7", theGraid, cnxFactory)
+    expect(server).toBeInstanceOf(CnxListener)
+    server.startListening()
     pserver.res(server)
 })
 
-var cnx: TestEcho
+var cnx: TestEchoCnx
 test("connection", cnx_done => {
   pserver.promise.then((server) => {
     pcnxt.promise.then((cnxHandler) => {
-      expect(cnxHandler).toBeInstanceOf(TestEcho)
-      cnx = cnxHandler as TestEcho;
+      expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
+      cnx = cnxHandler as TestEchoCnx;
       cnx_done()
     })
   })

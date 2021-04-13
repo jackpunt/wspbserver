@@ -1,6 +1,6 @@
 import { CgBaseCnx } from "./CgBase";
 import { CgMessage, CgType } from "./CgProto";
-import { pbMessage } from "./wspbserver";
+import { CnxListener, pbMessage, WSSOpts } from "./wspbserver";
 
 class ClientGroup extends Array<CgServerCnx> {
   aname: string;
@@ -8,6 +8,7 @@ class ClientGroup extends Array<CgServerCnx> {
   waiting_client_cnx: CgServerCnx;
 }
 
+/** Server-side Client-Group connection handler. */
 export class CgServerCnx extends CgBaseCnx<pbMessage> {
   static groups: Record<string, ClientGroup> // Map(group-name:string => CgMessageHanlder[])
 
@@ -110,7 +111,11 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
     // when this.group.find(g => g.waiting_for_ack) == false --> sendAck()
     return
   }
-  /** sentToReferee, sendToGroup, ack when done */
+  /** 
+   * sendToReferee(), sendToGroup(), sendAck() when done 
+   * @param message forward this CgMessage<pbMessage> to Group.
+   * @override
+   */
   eval_send(message: CgMessage): void {
     // send "done" to origin when everyone has replied. unless ref Nak's it...
     let send_ack_done = () => { this.sendAck("done") }
@@ -162,8 +167,9 @@ class CgAutoAckCnx extends CgServerCnx {
   constructor(public server: CgServerCnx) {
     super(null, null) // no websocket, no inner_msg_handler
   }
-  /** don't actually send anything.
-   * return a Promise<Ack> that is resolved.
+  /** 
+   * No actual Socket; don't 'send' anything.
+   * @return a Promise<Ack> that is resolved.
    */
   sendToSocket(message: CgMessage): Promise<CgMessage> {
     if (CgServerCnx.msgsToAck.includes(message.type)) {
@@ -174,3 +180,12 @@ class CgAutoAckCnx extends CgServerCnx {
     }
   }
 }
+
+
+const theGraid: WSSOpts = {
+	domain: ".thegraid.com",
+	port: 8444,
+	keydir: "/Users/jpeck/keys/"
+}
+
+new CnxListener("game7", theGraid, (ws) => new CgServerCnx(ws, null)).startListening()

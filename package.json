@@ -10,6 +10,7 @@
     "patch": "replace 'serializeBinary(): Uint8Array { throw new Error(\"Method not implemented.\"); }' 'serializeBinary(): Uint8Array { return this.serialize(); }\n    static deserializeBinary(bytes: Uint8Array): CgMessage { return CgMessage.deserialize(bytes); }' -- src/CgProto.ts ",
     "protojs": "protoc -I src/proto --js_out=import_style=commonjs,binary:. src/proto/*.proto",
     "protots": "protoc -I src/proto --ts_out=src src/proto/*.proto",
+    "echo": "node dist/out-tsc/echoserver.js",
     "test": "jest --runInBand --force-exit --detectOpenHandles",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
