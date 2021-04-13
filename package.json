@@ -11,6 +11,7 @@
     "protojs": "protoc -I src/proto --js_out=import_style=commonjs,binary:. src/proto/*.proto",
     "protots": "protoc -I src/proto --ts_out=src src/proto/*.proto",
     "echo": "node dist/out-tsc/echoserver.js",
+    "cgserve": "node dist/out-tsc/CgServer.js",
     "test": "jest --runInBand --force-exit --detectOpenHandles",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
