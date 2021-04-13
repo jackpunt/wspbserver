@@ -31,8 +31,8 @@ export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> imple
   // (send them an immediate nak)
   waiting_for_ack: CgMessage; // the message that was sent
   promise_of_ack: Promise<CgMessage>;
-  promise_resolve: (msg: CgMessage)=>void
-  promise_reject: (reason: any)=>void
+  promise_resolve: (msg: CgMessage) => void
+  promise_reject: (reason: any) => void
 
   deserialize(bytes: DataBuf): CgMessage {
     return CgMessage.deserialize(bytes)
@@ -69,7 +69,7 @@ export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> imple
    */
   sendWrapped(message: IN): Promise<CgMessage> {
     let bytes = message.serializeBinary();
-    let cgmsg: CgMessage = new CgMessage({type: CgType.send, msg: bytes});
+    let cgmsg: CgMessage = new CgMessage({ type: CgType.send, msg: bytes });
     return this.sendToSocket(cgmsg)
   }
   /** 
@@ -200,5 +200,5 @@ export class CgBaseCnx<IN extends pbMessage> extends CnxHandler<CgMessage> imple
     console.log("CgBase.none:", message)
     return
   }
-  
+
 }

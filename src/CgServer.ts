@@ -37,7 +37,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
     }
     if (!!this.waiting_for_ack && message.type != CgType.ack) {
       console.log("sendNak: outstanding ack")
-      this.sendNak("outstanding ack: "+this.waiting_for_ack.type)
+      this.sendNak("outstanding ack: " + this.waiting_for_ack.type)
       return
     }
     super.parseEval(message)
@@ -60,7 +60,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
     } else {
       // Some non-ref client sent a NAK... we can't really help them.
       // maybe they were busy or confused? and resending might help?
-      if (message.cause === "resend" && this.nak_count < 1){
+      if (message.cause === "resend" && this.nak_count < 1) {
         this.sendToSocket(req)
         this.nak_count != 1;
       } else {
@@ -95,7 +95,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
     this.group.splice(this.group.indexOf(this))
     // close group if nobody left:
     if (this.group.length === 1 && this.group[0] instanceof CgServerCnx) {
-      this.group[0].sendToSocket(new CgMessage({type: CgType.leave, client_id: 0, cause: "all gone"}))
+      this.group[0].sendToSocket(new CgMessage({ type: CgType.leave, client_id: 0, cause: "all gone" }))
       return
     }
     if (this.group.length === 0) {
