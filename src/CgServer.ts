@@ -1,16 +1,15 @@
-import { Server } from "node:http";
 import { CgBaseCnx } from "./CgBase";
 import { CgMessage, CgType } from "./CgProto";
 import { pbMessage } from "./wspbserver";
 
-class Group extends Array<CgServerCnx> {
+class ClientGroup extends Array<CgServerCnx> {
   aname: string;
   /** the client who initiated the group send, and is waiting for ref/group to ack. */
   waiting_client_cnx: CgServerCnx;
 }
 
 export class CgServerCnx extends CgBaseCnx<pbMessage> {
-  static groups: Record<string, Group> // Map(group-name:string => CgMessageHanlder[])
+  static groups: Record<string, ClientGroup> // Map(group-name:string => CgMessageHanlder[])
 
   group_name: string;  // group to which this connection is join'd
   nak_count: number;   // for dubious case of client nak'ing a request.
@@ -78,9 +77,9 @@ export class CgServerCnx extends CgBaseCnx<pbMessage> {
       return
     }
     let join_name = message.group
-    let group: Group = CgServerCnx.groups[join_name]
+    let group: ClientGroup = CgServerCnx.groups[join_name]
     if (!group) {
-      group = new Group();
+      group = new ClientGroup();
       group.aname = message.cause; // for ease of debug reference
       console.log("CgServer.eval_join: new Group", group)
       CgServerCnx.groups[join_name] = group
