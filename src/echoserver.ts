@@ -1,4 +1,5 @@
-import { CnxListener, EchoCnx, WSSOpts } from "./wspbserver"
+import { CnxListener, WSSOpts } from "./wspbserver"
+import { EchoCnx } from "./EchoCnx"
 
 const theGraid: WSSOpts = {
 	domain: ".thegraid.com",

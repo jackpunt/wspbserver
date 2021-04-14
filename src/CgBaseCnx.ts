@@ -1,5 +1,6 @@
+import type { DataBuf, EitherWebSocket, pbMessage, PbParser } from "./wspbserver";
 import { CgMessage, CgType } from "./CgProto";
-import { CnxHandler, DataBuf, EitherWebSocket, pbMessage, PbParser } from "./wspbserver";
+import { CnxHandler } from "./CnxHandler";
 
 
 
@@ -30,7 +31,7 @@ export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> im
    * @param ws 
    * @param inner_msg_handler 
    */
-  constructor(ws: EitherWebSocket, inner_msg_handler: PbParser<INNER>) {
+  constructor(ws: EitherWebSocket | string, inner_msg_handler: PbParser<INNER>) {
     super(ws)
     this.inner_msg_handler = inner_msg_handler;
   }

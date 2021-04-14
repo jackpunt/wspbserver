@@ -1,6 +1,6 @@
-import { CgBaseCnx } from "./CgBase";
+import { CgBaseCnx } from "./CgBaseCnx";
 import { CgMessage, CgType } from "./CgProto";
-import { CnxListener, pbMessage, WSSOpts } from "./wspbserver";
+import type { CnxListener, pbMessage, WSSOpts } from "./wspbserver";
 
 class ClientGroup extends Array<CgServerCnx> {
   aname: string;
@@ -180,12 +180,3 @@ class CgAutoAckCnx extends CgServerCnx {
     }
   }
 }
-
-
-const theGraid: WSSOpts = {
-	domain: ".thegraid.com",
-	port: 8444,
-	keydir: "/Users/jpeck/keys/"
-}
-
-new CnxListener("game7", theGraid, (ws) => new CgServerCnx(ws, null)).startListening()

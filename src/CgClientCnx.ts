@@ -1,6 +1,6 @@
-import { CgBaseCnx } from './CgBase';
+import type { EitherWebSocket, pbMessage, PbParser } from './wspbserver';
 import { CgMessage, CgType } from './CgProto';
-import { EitherWebSocket, pbMessage, PbParser } from './wspbserver';
+import { CgBaseCnx } from './CgBaseCnx';
 
 /** 
  * A web client using CgProto (client-group.proto)
@@ -8,9 +8,9 @@ import { EitherWebSocket, pbMessage, PbParser } from './wspbserver';
  * Provide a inner_msg_handler:PbParser<INNER> for the wrapped protocol.
  * 
  */
-export class CgClient<INNER extends pbMessage> extends CgBaseCnx<pbMessage> {
+export class CgClientCnx<INNER extends pbMessage> extends CgBaseCnx<pbMessage> {
 
-  constructor(ws: EitherWebSocket, inner_msg_handler: PbParser<INNER>) {
+  constructor(ws: EitherWebSocket | string, inner_msg_handler: PbParser<INNER>) {
     super(ws, inner_msg_handler)
   }
 

@@ -6,6 +6,7 @@
     "sourceMap": true,
     "target": "ES2018",
     "module": "commonjs",
+    "importsNotUsedAsValues": "error",
     // https://stackoverflow.com/questions/58384179/syntaxerror-cannot-use-import-statement-outside-a-module
 
     // Tells TypeScript to read JS files, as

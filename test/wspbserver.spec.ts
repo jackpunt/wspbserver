@@ -1,4 +1,6 @@
-import { CLOSE_CODE, CnxFactory, CnxHandler, CnxListener, EchoCnx, EitherWebSocket, pbMessage, PbParser, WSSOpts } from "../src/wspbserver";
+import { CLOSE_CODE, CnxFactory, CnxListener, EitherWebSocket, pbMessage, WSSOpts } from "../src/wspbserver";
+import type { CnxHandler } from '../src/CnxHandler'
+import { EchoCnx } from '../src/EchoCnx'
 import { EzPromise } from "../src/EzPromise";
 const moment = require('moment');
 
@@ -42,12 +44,13 @@ class TestEchoCnx extends EchoCnx {
 }
 
 const fmt = "YYYY-MM-DD kk:mm:ss.SS"
-console.log("Start Test", moment().format(fmt))
+// console.log("Start Test", moment().format(fmt))
 test("WSSOpts", () => {
   expect(Object.entries(theGraid).length).toEqual(3);
 })
 
 var pserver = new EzPromise<CnxListener>()
+// console.log("pserver", pserver)
 var server: CnxListener;
 /** set when CnxHandler is created. */
 var pcnxt = new EzPromise<CnxHandler<pbMessage>>()
@@ -85,7 +88,7 @@ test("message received", msg_done => {
       }).catch((reason) => {
         expect(reason).toBe("closed")
       }).finally(() => {
-        console.log("received %s messages!", count)
+        // console.log("received %s messages!", count)
         msg_test_p.resolve("message recieved")
         msg_done()
       })
@@ -104,7 +107,8 @@ test("close client", close_done => {
           expect(reason).toBe(undefined)
           close_done()
         })
-      cnx.ws.close(close_code, close_msg)
+        // console.log("close client", close_msg)
+        cnx.ws.close(close_code, close_msg)
       })
     })
   })
@@ -124,6 +128,7 @@ test("close server", srv_closed => {
             srv_closed()
           }, 300)
         }
+        // console.log("close server", server)
         server.wss.close(cb)
       })
     })
