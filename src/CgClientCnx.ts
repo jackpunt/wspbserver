@@ -1,6 +1,7 @@
 import type { EitherWebSocket, pbMessage, PbParser } from './wspbserver';
+import { CgBaseCnx, ParserFactory } from './CgBaseCnx';
 import { CgMessage, CgType } from './CgProto';
-import { CgBaseCnx } from './CgBaseCnx';
+import type { CnxHandler } from '.';
 
 /** 
  * A web client using CgProto (client-group.proto)
@@ -8,10 +9,10 @@ import { CgBaseCnx } from './CgBaseCnx';
  * Provide a inner_msg_handler:PbParser<INNER> for the wrapped protocol.
  * 
  */
-export class CgClientCnx<INNER extends pbMessage> extends CgBaseCnx<pbMessage> {
+export class CgClientCnx<INNER extends pbMessage> extends CgBaseCnx<INNER, CgMessage> {
 
-  constructor(ws: EitherWebSocket | string, inner_msg_handler: PbParser<INNER>) {
-    super(ws, inner_msg_handler)
+  constructor(ws: EitherWebSocket | string, inner_msg_factory: ParserFactory<INNER, CgMessage>) {
+    super(ws, inner_msg_factory)
   }
 
   /** send_join client makes a connection to server group */

@@ -45,7 +45,7 @@ class TestEchoCnx extends EchoCnx {
 
 const fmt = "YYYY-MM-DD kk:mm:ss.SS"
 // console.log("Start Test", moment().format(fmt))
-test("WSSOpts", () => {
+test("wss: WSSOpts", () => {
   expect(Object.entries(theGraid).length).toEqual(3);
 })
 
@@ -60,15 +60,16 @@ var cnxFactory: CnxFactory = (ws: EitherWebSocket) => {
   pcnxt.resolve(cnxHandler)
   return cnxHandler
 }
-test("make server", () => {
+test("wss: make server", () => {
     server = new CnxListener("game7", theGraid, cnxFactory)
     expect(server).toBeInstanceOf(CnxListener)
     server.startListening()
+    console.log("Ready for client connection")
     pserver.resolve(server)
 })
 
 var cnx: TestEchoCnx
-test("connection", cnx_done => {
+test("wss: connection", cnx_done => {
   pserver.then((server) => {
     pcnxt.then((cnxHandler) => {
       expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
@@ -79,7 +80,7 @@ test("connection", cnx_done => {
 }, 30000)
 
 var msg_test_p = new EzPromise<string>()
-test("message received", msg_done => {
+test("wss: message received", msg_done => {
   let count = 3
   pserver.then(() => {
     pcnxt.then(() => {
@@ -96,7 +97,7 @@ test("message received", msg_done => {
   })
 }, 30000)
 
-test("close client", close_done => {
+test("wss: close client", close_done => {
   let close_msg = "Message done", close_code = CLOSE_CODE.EndpointUnavailable
   pserver.finally(() => {
     pcnxt.finally(() => {
@@ -116,7 +117,7 @@ test("close client", close_done => {
 //cnx.ws.close(0, "test done")
 
 
-test("close server", srv_closed => {
+test("wss: close server", srv_closed => {
   // "await" appends: .then((data) => {expect(data)...})
   pserver.finally(() => {
     pcnxt.finally().then(() => {

@@ -6,6 +6,7 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import type { CnxHandler } from "./CnxHandler";
+import type { CgServerCnx, CgMessage } from ".";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
@@ -30,10 +31,11 @@ export interface  WSSOpts { domain: string, port: number, keydir: string, }
 
 /** a subset of https.ServerOptions */
 export type Credentials = https.ServerOptions // {key: string, cert: string}
-export type EitherWebSocket = WebSocket | ws.WebSocket
 export type DataBuf = Buffer | Uint8Array
+export interface SocketSender { sendBuffer(bytes: DataBuf, cb?: (error: Event | Error) => void): void }
+export type EitherWebSocket = WebSocket | ws.WebSocket
 export type CnxFactory = (ws: EitherWebSocket) => CnxHandler<pbMessage>;
-export const fmt = "YYYY-MM-DD kk:mm:ss.SS"
+export const fmt = "YYYY-MM-DD kk:mm:ss.SSS"
 
 export interface WsServerOptions extends ws.ServerOptions {
 	host?: string, port?: number, 
@@ -60,7 +62,7 @@ export interface WebSocketEventHandler {
 
 export interface PbParser<T extends pbMessage> {
 	deserialize(bytes: DataBuf): T
-	parseEval(message:T): void;
+	parseEval(message:T, ...args:any): void;
 }
 /**
  * a Secure WebSocket Listener (wss://)
@@ -124,10 +126,10 @@ export class CnxListener {
 		return new ws.Server(Object.assign({}, opts, {server: httpsServer}));
 	}
 	make_wss_server(host: string, port: number): ws.Server {
-		console.log('try listen on %s:%d', host, port);
-		//pass in your express app and credentials to create an https server
+		// console.log('%s try listen on %s:%d', moment().format(fmt), host, port);
+		// pass in your express app and credentials to create an https server
 		let httpsServer = https.createServer(this.credentials, undefined).listen(port, host);
-		console.log('listening on %s:%d', host, port);
+		// console.log('%s listening on %s:%d', moment().format(fmt), host, port);
 		const wss = this.wssUpgrade(httpsServer)
 		console.log('%s starting: wss=%s', moment().format(fmt), wss);
 		return wss;

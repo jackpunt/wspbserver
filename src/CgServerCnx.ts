@@ -1,6 +1,6 @@
 import { CgBaseCnx } from "./CgBaseCnx";
 import { CgMessage, CgType } from "./CgProto";
-import type { CnxListener, pbMessage, WSSOpts } from "./wspbserver";
+import type { pbMessage } from "./wspbserver";
 
 class ClientGroup extends Array<CgServerCnx> {
   aname: string;
@@ -9,7 +9,7 @@ class ClientGroup extends Array<CgServerCnx> {
 }
 
 /** Server-side Client-Group connection handler. */
-export class CgServerCnx extends CgBaseCnx<pbMessage> {
+export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
   static groups: Record<string, ClientGroup> // Map(group-name:string => CgMessageHanlder[])
 
   group_name: string;  // group to which this connection is join'd

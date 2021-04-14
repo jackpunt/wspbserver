@@ -1,9 +1,10 @@
-import type { DataBuf, EitherWebSocket, pbMessage, PbParser } from "./wspbserver";
+import type { DataBuf, EitherWebSocket, pbMessage, PbParser, SocketSender } from "./wspbserver";
 import { CgMessage, CgType } from "./CgProto";
 import { CnxHandler } from "./CnxHandler";
 
 
-
+export type ParserFactory<INNER extends pbMessage, OUTER extends CgMessage> 
+   = (cnx: CgBaseCnx<INNER, OUTER>) => PbParser<INNER>;
 
 /**
  * Extends CnxHandler<pbMessage> to handle Client-Group proto messages.
@@ -18,7 +19,7 @@ import { CnxHandler } from "./CnxHandler";
  * Implement/override: join, leave, send, ack
  * Send a CgMessage with: sendToSocket(msg: CgMessage) or sendWrapped(msg: IN)
  */
-export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> implements PbParser<CgMessage> {
+export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends CnxHandler<OUTER> implements PbParser<OUTER> {
   static msgsToAck = [CgType.send, CgType.join, CgType.leave]
 
   /**
@@ -28,15 +29,18 @@ export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> im
    * 
    * Supply a PbParser<INNER> to deserialize and parseEval the INNER messages.
    * 
+   * Can chain when: (inner_msg_handler: PbParser<INNER> instanceof CgBaseCnx<INNER>)
+   * 
    * @param ws 
-   * @param inner_msg_handler 
+   * @param inner_msg_factory produces a PbParser based on this CnxHandler
    */
-  constructor(ws: EitherWebSocket | string, inner_msg_handler: PbParser<INNER>) {
-    super(ws)
-    this.inner_msg_handler = inner_msg_handler;
+  constructor(ws: EitherWebSocket | string, inner_msg_factory: ParserFactory<INNER, CgMessage>) {
+    super(ws) // this.ws = ws; this.msg_handler<CgMessag> = this;
+    this.inner_msg_handler = inner_msg_factory && inner_msg_factory(this)
   }
 
-  inner_msg_handler: PbParser<INNER>
+  // Chain: CnxHandler<CgMessage>(ws) -> msg_handler: CgClientCnx=CgBaseCnx<CmMessage>(ws, CmClient(this, CmProtoCnx)) ->
+  inner_msg_handler: PbParser<INNER> // which typically ISA CnxHandler<INNER>
 
   group_name: string;  // group to which this connection is join'd
   client_id: number;   // my client_id for this group.
@@ -48,8 +52,8 @@ export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> im
   promise_resolve: (msg: CgMessage) => void
   promise_reject: (reason: any) => void
 
-  deserialize(bytes: DataBuf): CgMessage {
-    return CgMessage.deserialize(bytes)
+  deserialize(bytes: DataBuf): OUTER {
+    return CgMessage.deserialize(bytes) as OUTER
   }
   /**
    * @param ev
@@ -147,6 +151,7 @@ export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> im
     this.ws.close(0, cause) // presumably ref will have an onclose to kill itself
   }
 
+  isClient0(): boolean { return this.client_id === 0 }
   /**
    * process positive Ack for join, leave, send.
    * Resolve the outstanding send Promise<CgMessage> 
@@ -194,17 +199,19 @@ export class CgBaseCnx<INNER extends pbMessage> extends CnxHandler<CgMessage> im
   }
 
   /**
-   * delegate to inner protocol handler.
+   * Process message delivered to Client-Group.
    * 
-   * Could be acting as a CgServer, with Inner Protocol Handler as our client.
-   * But in general, just send the message, and let specializations understand the underlying protocol<IN>
+   * For CgServerCnx: override to sendToGroup()
+   * else server would parseEval on behalf of the client...? [if it has inner_msg_handler]
+   * 
+   * For CgClientCnx: delegate to inner protocol handler
+   * inner.parseEval(inner.deserialize(message.msg))
    * 
    * @param message containing message<IN>
    * @returns 
    */
   eval_send(message: CgMessage): void {
     console.log("CgBase.send:", message)
-    //this.msg_handler.wsmessage(message.msg)
     let msg = this.inner_msg_handler.deserialize(message.msg)
     this.inner_msg_handler.parseEval(msg)
     return
