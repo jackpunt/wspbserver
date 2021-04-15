@@ -12,13 +12,13 @@ export class EchoCnx extends CnxHandler<pbMessage> {
 	 */
 	wsmessage(buf: DataBuf) {
 		console.log("%s RECEIVED:", moment().format(fmt), buf.length, buf);
-		let ack = (error: Error) => {
+		let sendBufCb = (error: Error) => {
 			if (!error) {
-				console.log('%s sent: %s', moment().format(fmt), "success");
+				console.log('%s EchoCnx sent: %s', moment().format(fmt), "success");
 			} else {
-				console.log('%s error: %s', moment().format(fmt), error);
+				console.log('%s EchoCnx error: %s', moment().format(fmt), error);
 			}
 		};
-		this.sendBuffer(buf, ack);
+		this.sendBuffer(buf, sendBufCb);
 	}
 }

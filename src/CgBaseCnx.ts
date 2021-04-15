@@ -7,7 +7,7 @@ export type ParserFactory<INNER extends pbMessage, OUTER extends CgMessage>
    = (cnx: CgBaseCnx<INNER, OUTER>) => PbParser<INNER>;
 
 /**
- * Extends CnxHandler<pbMessage> to handle Client-Group proto messages.
+ * Extends CnxHandler<pbMessage> to handle Client-Group Messages.
  * Implements basic/common Client-Group messaging.
  * 
  * Specialize for CgClient and CgServer; 
@@ -42,7 +42,9 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
   // Chain: CnxHandler<CgMessage>(ws) -> msg_handler: CgClientCnx=CgBaseCnx<CmMessage>(ws, CmClient(this, CmProtoCnx)) ->
   inner_msg_handler: PbParser<INNER> // which typically ISA CnxHandler<INNER>
 
+  /** group from Ack of join() */
   group_name: string;  // group to which this connection is join'd
+  /** client_id from Ack of join() */
   client_id: number;   // my client_id for this group.
 
   // this may be tricky... need to block non-ack from any client with outstanding ack
@@ -83,15 +85,6 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
   }
 
   /** 
-   * send a [sub-protocol] message, wrapped in a CgMessage.
-   * @return Promise that resolves to the Ack/Nak message
-   */
-  sendWrapped(message: INNER): Promise<CgMessage> {
-    let bytes = message.serializeBinary();
-    let cgmsg: CgMessage = new CgMessage({ type: CgType.send, msg: bytes });
-    return this.sendToSocket(cgmsg)
-  }
-  /** 
    * Send message to websocket. 
    * save functions to resolve/reject this.promise_of_ack
    * @return a Promise of Ack for CgType: join, leave, send. (else undefined)
@@ -109,6 +102,45 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
     }
     return this.promise_of_ack
   }
+  /** 
+   * send a [sub-protocol] message, wrapped in a CgMessage.
+   * @return Promise that resolves to the Ack/Nak message
+   */
+  sendWrapped(message: INNER): Promise<CgMessage> {
+    let bytes = message.serializeBinary();
+    let cgmsg: CgMessage = new CgMessage({ type: CgType.send, msg: bytes });
+    return this.sendToSocket(cgmsg)
+  }
+  /**
+   * send wrapped message to socket
+   * @param bytes DataBuf containing pbMessage<INNER>
+   * @param id client_id 
+   */
+  send_send(message: INNER, id?: number): Promise<CgMessage> {
+    return this.sendWrapped(message)
+  }
+  /**
+   * send_join client makes a connection to server group
+   * @param group group name
+   * @param id client_id
+   * @param cause identifying string
+   * @returns a Promise that completes when an Ack/Nak is recieved
+   */
+  send_join(group: string, id?: number, cause?: string): Promise<CgMessage> {
+    return this.sendToSocket(new CgMessage({ type: CgType.join, group: group, client_id: id, cause: cause }))
+  }
+  /**
+   * client makes a connection to server group.
+   * 
+   * @param group group_name
+   * @param id the client_id
+   * @param cause identifying string
+   * @returns a Promise that completes when an Ack/Nak is recieved
+   */
+  send_leave(group: string, id?: number, cause?: string): Promise<CgMessage> {
+    return this.sendToSocket(new CgMessage({ type: CgType.leave, group: group, client_id: id }))
+  }
+
   /** 
    * Nak from referee indicates that message was semantically illegal.
    * Referee never[?] initiates a request message; can Nak a request; 
@@ -147,11 +179,14 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
       }
     }
   }
+  /**
+   * Action to take after leaving group.
+   * Base: close socket
+   * @param cause 
+   */
   on_leave(cause: string) {
     this.ws.close(0, cause) // presumably ref will have an onclose to kill itself
   }
-
-  isClient0(): boolean { return this.client_id === 0 }
   /**
    * process positive Ack for join, leave, send.
    * Resolve the outstanding send Promise<CgMessage> 
@@ -159,6 +194,7 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
   eval_ack(message: CgMessage, req: CgMessage): void {
     let type = req.type;
     if (type === CgType.join) {
+      this.group_name = message.group
       this.client_id = message.client_id
     } else if (type === CgType.leave) {
       this.on_leave(message.cause)
@@ -187,7 +223,7 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
     return
   }
 
-  /** informed that other client has departed */
+  /** informed that [other] client has departed */
   eval_leave(message: CgMessage): void {
     console.log("CgBase.leave:", message)
     if (message.client_id === this.client_id) {
