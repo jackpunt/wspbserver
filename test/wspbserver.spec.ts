@@ -1,12 +1,6 @@
-import { CLOSE_CODE, CnxFactory, CnxListener, DataBuf, EitherWebSocket, pbMessage, WSSOpts } from "../src/wspbserver";
-import type { CnxHandler } from '../src/CnxHandler'
+import { CLOSE_CODE, CnxFactory, CnxListener, DataBuf, EitherWebSocket, pbMessage, stime, WSSOpts } from "../src/wspbserver";
 import { EchoCnx } from '../src/EchoCnx'
 import { EzPromise } from "../src/EzPromise";
-
-const moment = require('moment');
-
-const fmt = "YYYY-MM-DD kk:mm:ss.SSS"
-var timeStr = () => moment().format(fmt)
 
 const theGraid: WSSOpts = {
 	domain: ".thegraid.com",
@@ -16,20 +10,10 @@ const theGraid: WSSOpts = {
 var testTimeout = 8000
 
 var qtest = (name: string, fn?, timeout?) => {}
-var ptest = (name: string, promises: EzPromise<any>[], resfn?, rejfn?, timeout?: number): void => {
-  if (typeof (rejfn) !== 'function') { timeout = rejfn; rejfn = (reason: any) => { } }
-  if (typeof (resfn) !== 'function') { timeout = resfn; resfn = (value: any) => { } }
-  console.log("ztest: name=%s, timeout=%s", name, timeout)
-  let prev = promises.reverse()
-  let inner = prev.shift()
+
+var dtest = (name: string, pfunc: ()=>void, timeout?: number): void => {
   let donefn: jest.DoneCallback;
-  let fil = (val) => {resfn(val); donefn() }
-  let rej = (rea) => {rejfn(rea); donefn() }
-  let func = () => { inner.then(fil, rej) }
-  let funcs: Array<()=>void> = [ func ]
-  prev.forEach((p,n) => {
-    func = funcs[n+1] = () => p.finally(() => funcs[n]()); 
-  });
+  let func = () => { pfunc(); donefn() }
   //test(name, func0, timeout)
   test(name, donfn => { donefn = donfn; func() }, timeout)
 }
@@ -56,7 +40,7 @@ class TestEchoCnx extends EchoCnx {
     for (let i = 0; i<n; i++) {
       let msgPith = new EzPromise<DataBuf>()
       msgPith.catch((reason: any) => {
-        console.log("%s msgP.catch: reason=", timeStr(), reason)
+        console.log("%s msgP.catch: reason=", stime(), reason)
       })
       this.msgP.push(msgPith)
     }
@@ -94,9 +78,11 @@ class TestEchoCnx extends EchoCnx {
   }
   /** Interpose to count messages. */
   wsmessage(buf: DataBuf) {
-    super.wsmessage(buf)  // echo the message to sender
-    this.countP.resolve(buf)
-    this.msgCount++
+    setTimeout(() => {
+      super.wsmessage(buf)  // echo the message to sender
+      this.countP.resolve(buf)
+      this.msgCount++
+    }, 15)
   }
   onopen(ev: Event) {
     console.log("TestEcho. onopen:", ev)
@@ -109,14 +95,14 @@ class TestEchoCnx extends EchoCnx {
   }
 }
 
-// console.log("Start Test", timeStr())
+// console.log("Start Test", stime())
 test("wss: WSSOpts", () => {
   expect(Object.entries(theGraid).length).toEqual(3);
 })
 
 var pserver = new EzPromise<CnxListener>()
 pserver.catch((reason: any) => {
-  console.log("%s pserver.catch: reason=", timeStr(), reason)
+  console.log("%s pserver.catch: reason=", stime(), reason)
 })
 // console.log("pserver", pserver)
 var server: CnxListener;
@@ -134,141 +120,56 @@ test("wss: make server", () => {
     server = new CnxListener("game7", theGraid, cnxFactory)
     expect(server).toBeInstanceOf(CnxListener)
     server.startListening()
-    console.log("%s Ready for client connection", timeStr())
+    console.log("%s Ready for client connection", stime())
     pserver.resolve(server)
 })
 
 var cnx: TestEchoCnx = testEchoCnx;
-qtest("wss: connection", cnx_done => {
-  pserver.finally(() => {
-    pcnxt.then((cnxHandler: TestEchoCnx) => {
-      expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
-      console.log("%s client connection", timeStr())
-      cnx.setMsgTimeout(400, 50)
-      cnx_done()
-    })
-  })
-}, testTimeout)
-ptest("wss: zconnection", [ pcnxt],
-  (cnxHandler: TestEchoCnx) => {
+dtest("wss: zconnection", () =>
+  pcnxt.then((cnxHandler: TestEchoCnx) => {
     expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
-    console.log("%s client connection", timeStr())
+    console.log("%s client connection", stime())
     cnx.setMsgTimeout(400, 50)
-  },
-    testTimeout)
+  }), testTimeout)
 
-
-var simpleres = (result: any) => {
-  expect(result).toBeTruthy()
-  console.log("%s wss: simple", timeStr())
-}
-var simplerej = (reason: any) => {
-  expect(reason).toBeTruthy()
-  console.log("%s wss: simple", timeStr())
-}
-var simplep = new EzPromise<number>(); simplep.resolve(5)
-ptest("wss: simple", [simplep, pserver], simpleres, simplerej, testTimeout)
-test("wss: simple test",
-  donef => {
-    let func = () => {
-        pserver.then(
-          (res) => { simpleres(res); donef() },
-          (rea) => { simplerej(rea); donef() }
-        )
-      };
-     let fin = () => {
-      simplep.finally(
-        () => func()
-      )
-    }
-    fin()
-  },
-  testTimeout)
-/** linked to cnx.promiseAll: Promises.all() */
-var all_msgs_recd = new EzPromise<string>()
-test("wss: all messages received", msg_done => {
-  let count = cnx.msgMax // get all requested messages
-  let allMsgs = cnx.promiseAll // uber Promise
-  pserver.finally(() => {
-    pcnxt.then(() => {
-      allMsgs.then((data) => {
-        console.log("%s allMsgs.filled: data.length=", timeStr(), data.length)
-        expect(data.length).toBe(count)
-        cnx.ws.close(CLOSE_CODE.NormalCLosure, "all messages received")
-      }, (reason: any) => {
-        console.log("%s allMsgs.rejected: reason=", timeStr(), reason)
+var close_reason = "all messages recieved"
+dtest("wss: all messages received", () => {
+      msg_cnt_rcvd.then((count) => {
+        setTimeout(()=>{
+        console.log("%s allMsgs.filled: count=", stime(), count)
+        expect(count).toBe(cnx.msgMax)
+        cnx.ws.close(CLOSE_CODE.NormalCLosure, close_reason)
+        }, 30)
+      }, (rej_reason: any) => {
+        console.log("%s allMsgs.rejected: reason=", stime(), rej_reason)
         cnx.ws.close(CLOSE_CODE.Empty, "failed")
-      }).catch((reason) => {
-        console.log("%s allMsgs.catch: reason=", timeStr(), reason)
-        expect(reason).toBeDefined()
-      }).finally(() => {
-        // console.log("%s allMsgs.finally: count= %s", timeStr(), count)
-        all_msgs_recd.resolve("all messages done")
-        msg_done()
+      }).catch((rej_reason) => {
+        console.log("%s allMsgs.catch: reason=", stime(), rej_reason)
+        expect(rej_reason).toBeDefined()
       })
-    })
-  })
 }, testTimeout+5000)
 
-// ztest("name", [], (res) => { expect(foo).toBe() })
-// test("name", done => { fn(); done(); })
-// test("name", done => inner.then(n(); done(); ) )
-let resfn = (result: CloseInfo) => {
-  console.log("%s close client: resfn result=", timeStr(), result)
-  let close_msg = "Message done", close_code = CLOSE_CODE.NormalCLosure
-  let { code, reason } = result
-  expect(code).toBe(close_code)
-  expect(reason).toBe(undefined)
-}
-let rejfn = (rej: any): void => {
-  console.log("%s close client: rejfn", timeStr(), rej)
-}
-
-//ztest("wss: close", [pserver, pcnxt, msg_cnt_rcvd, closeP], resfn, rejfn, testTimeout )
-
-/** verify local socket is closed, due to closing client socket */
-test("wss: close client", close_done => {
-  let donefn = () => { }
-  let iff =
-    (res) => {
-      console.log("%s close client: iff", timeStr())
-      resfn(res);
-      donefn();
-    }
-  let ifr = (rej) => {
-    console.log("%s close client: ifr", timeStr())
-    rejfn(rej);
-    donefn();
-  }
-  console.log("%s close client: testfn invoked", timeStr(), close_done)
-  donefn = close_done
-  
-  pserver.finally(() => {
-    pcnxt.finally(() => {
-      all_msgs_recd.finally(() => {
-        closeP.then(iff, ifr)
-      })
-    })
-  })
-}, testTimeout)
+/** verify local socket closed cleanly */
+dtest("wss: close client", () =>
+  closeP.then((result: CloseInfo) => {
+    console.log("%s close client: resfn result=", stime(), result)
+    let close_code = CLOSE_CODE.NormalCLosure
+    let { code, reason } = result
+    expect(code).toBe(close_code)
+    expect(reason || close_reason).toBe(close_reason)
+}), testTimeout)
 
 
 test("wss: close server", srv_closed => {
-  pserver.finally(() => {
-    pcnxt.finally(() => {
-      closeP.finally(() => {
-        let cb = (err: Error) => {
-          expect(err).toBeUndefined()
-          setTimeout(() => {
-            console.log("%s close server cb", timeStr(), server.wss.clients.size)
-            expect(server.wss.clients.size).toBe(0)
-            srv_closed()
-          }, 300)
-        }
-        console.log("%s close server", timeStr(), server.wss.clients.size)
-        // server.wss.close(cb)
-        setTimeout(()=>{server.wss.close(cb)}, 20) // wait a bit, then close:
+  closeP.finally(() => {
+    // wait a bit, then close server socket:
+    // setTimeout(() => {
+      console.log("%s close server", stime(), server.wss.clients.size)
+      server.wss.close((err: Error) => {
+        expect(err).toBeUndefined()
+        expect(server.wss.clients.size).toBe(0)
+        srv_closed()
       })
-    })
+    // }, 20)
   })
-}, testTimeout) // test timeout
+}, testTimeout)

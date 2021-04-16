@@ -1,4 +1,4 @@
-import * as wspb from "fs";
+import * as fs from "fs";
 import * as https from "https";
 import type * as http from "http";
 import * as dns from "dns";
@@ -6,7 +6,6 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import type { CnxHandler } from "./CnxHandler";
-import type { CgServerCnx, CgMessage } from ".";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
@@ -16,7 +15,7 @@ declare module 'ws' {
 
 export interface pbMessage extends jspb.Message {}
 
-// BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
+// node_modules/ws/lib/constants: BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
 export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
 
 /** 
@@ -36,6 +35,7 @@ export interface SocketSender { sendBuffer(bytes: DataBuf, cb?: (error: Event | 
 export type EitherWebSocket = WebSocket | ws.WebSocket
 export type CnxFactory = (ws: EitherWebSocket) => CnxHandler<pbMessage>;
 export const fmt = "YYYY-MM-DD kk:mm:ss.SSS"
+export function stime () { return moment().format(fmt)}
 
 export interface WsServerOptions extends ws.ServerOptions {
 	host?: string, port?: number, 
@@ -113,8 +113,8 @@ export class CnxListener {
 		})
 	}
 	getCredentials(keypath: string, certpath: string): Credentials {
-		let privateKey = wspb.readFileSync(this.keypath, 'utf8');
-		let certificate = wspb.readFileSync(this.certpath, 'utf8');
+		let privateKey = fs.readFileSync(this.keypath, 'utf8');
+		let certificate = fs.readFileSync(this.certpath, 'utf8');
 		return { key: privateKey, cert: certificate };
 	}
 
