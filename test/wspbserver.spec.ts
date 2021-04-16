@@ -13,7 +13,31 @@ const theGraid: WSSOpts = {
 	port: 8443,
 	keydir: "/Users/jpeck/keys/"
 }
-var testTimeout = 7000
+var testTimeout = 8000
+
+var qtest = (name: string, fn?, timeout?) => {}
+var ztest = (name: string, promises: EzPromise<any>[], resfn?, rejfn?, timeout?: number): void => {
+  if (typeof (rejfn) !== 'function') { timeout = rejfn; rejfn = (reason: any) => { } }
+  if (typeof (resfn) !== 'function') { timeout = resfn; resfn = (value: any) => { } }
+  console.log("ztest: name=%s, timeout=%s", name, timeout)
+  let prev = promises.reverse()
+  let inner = prev.shift()
+  let donefn: jest.DoneCallback;
+  let fil = (val) => {resfn(val); donefn() }
+  let rej = (rea) => {rejfn(rea); donefn() }
+  let func = () => { inner.then(fil, rej) }
+  let funcs: Array<()=>void> = [ func ]
+  prev.forEach((p,n) => {
+    func = funcs[n+1] = () => p.finally(() => funcs[n]()); 
+  });
+  //test(name, func0, timeout)
+  test(name, donfn => { donefn = donfn; func() }, timeout)
+}
+
+/** Promise filled when cnx.promiseAll is resolved. */
+var msg_cnt_rcvd: EzPromise<number> = new EzPromise<number>()
+/** Promise filled({code, reason}) when socket is closed. */
+var closeP: EzPromise<CloseInfo> = new EzPromise<CloseInfo>()
 
 type CloseInfo = {code: number, reason: string}
 /** TestEcho has no deserialize, parseEval nor msg_handler */
@@ -23,9 +47,7 @@ class TestEchoCnx extends EchoCnx {
     this.setMsgCount(msg_count)
   }
 
-  /** Promise resolved({code, reason}) when socket is closed. */
-  closeP: EzPromise<CloseInfo> = new EzPromise<CloseInfo>()
-  /** Promise resolved when msg_count message received, or any msg Promise is rejected. */
+  /** Promise filled when all Promise<message> filled; rejected when any Promise<message> is rejected. */
   promiseAll: Promise<DataBuf[]>;
   msgP: EzPromise<DataBuf>[] = Array<EzPromise<DataBuf>>()
   msgMax: number = 3;    // decrement to 0 -> 
@@ -49,8 +71,9 @@ class TestEchoCnx extends EchoCnx {
   getMsgs(count: number): Promise<DataBuf[]>  {
     let zero = this.msgCount
     let promises = this.msgP.slice(zero, zero+count)
-    console.log("%s getMsgs: promises.length=", timeStr, promises.length, zero, count)
+    // console.log("%s getMsgs: promises.length=", timeStr, promises.length, zero, count)
     this.promiseAll = Promise.all(promises)
+    this.promiseAll.finally(() => msg_cnt_rcvd.resolve(this.msgCount - zero))
     return this.promiseAll
   }
   setMsgTimeout(base: number, perMsg: number) {
@@ -82,7 +105,7 @@ class TestEchoCnx extends EchoCnx {
     super.onclose(ev)
     if (this.msgCount < this.msgP.length)
       this.countP.reject("client closed")
-    this.closeP.resolve({code: ev, reason: undefined}) // synthesize {code, reason} (wss only supplies code)
+    closeP.resolve({code: ev, reason: undefined}) // synthesize {code, reason} (wss only supplies code)
   }
 }
 
@@ -98,9 +121,9 @@ pserver.catch((reason: any) => {
 // console.log("pserver", pserver)
 var server: CnxListener;
 /** set when CnxHandler is created. */
-var pcnxt = new EzPromise<CnxHandler<pbMessage>>()
+var pcnxt = new EzPromise<TestEchoCnx>()
 /** Promises for each Message received and for Close */
-var testEchoCnx = new TestEchoCnx(null, null, 3); // Promises: testEchoCnx.msgP[3], testEchoCnx.closeP
+var testEchoCnx = new TestEchoCnx(null, null, 3); // Promises: testEchoCnx.msgP[3], closeP
 
 var cnxFactory: CnxFactory = (ws: EitherWebSocket) => {
   testEchoCnx.ws = ws;
@@ -116,9 +139,9 @@ test("wss: make server", () => {
 })
 
 var cnx: TestEchoCnx = testEchoCnx;
-test("wss: connection", cnx_done => {
+qtest("wss: connection", cnx_done => {
   pserver.finally(() => {
-    pcnxt.then((cnxHandler) => {
+    pcnxt.then((cnxHandler: TestEchoCnx) => {
       expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
       console.log("%s client connection", timeStr())
       cnx.setMsgTimeout(400, 50)
@@ -126,7 +149,41 @@ test("wss: connection", cnx_done => {
     })
   })
 }, testTimeout)
+// ztest("wss: zconnection", [pserver, pcnxt],
+//   (cnxHandler: TestEchoCnx) => {
+//     expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
+//     console.log("%s client connection", timeStr())
+//     cnx.setMsgTimeout(400, 50)
+//   },
+//     testTimeout)
 
+
+var simpleres = (result: any) => {
+  expect(result).toBeTruthy()
+  console.log("%s wss: simple", timeStr())
+}
+var simplerej = (reason: any) => {
+  expect(reason).toBeTruthy()
+  console.log("%s wss: simple", timeStr())
+}
+var simplep = new EzPromise<number>(); simplep.resolve(5)
+ztest("wss: simple", [simplep, pserver], simpleres, simplerej, testTimeout)
+test("wss: simple test",
+  donef => {
+    let func = () => {
+        pserver.then(
+          (res) => { simpleres(res); donef() },
+          (rea) => { simplerej(rea); donef() }
+        )
+      };
+     let fin = () => {
+      simplep.finally(
+        () => func()
+      )
+    }
+    fin()
+  },
+  testTimeout)
 /** linked to cnx.promiseAll: Promises.all() */
 var all_msgs_recd = new EzPromise<string>()
 test("wss: all messages received", msg_done => {
@@ -151,22 +208,8 @@ test("wss: all messages received", msg_done => {
       })
     })
   })
-}, testTimeout)
-var qtest = (name: string, fn?, timeout?) => {}
-var ztest = (name: string, promises: EzPromise<any>[], resfn?, rejfn?, timeout?: number): void => {
-  if (typeof (rejfn) !== 'function') { timeout = rejfn; rejfn = (reason: any) => { } }
-  if (typeof (resfn) !== 'function') { timeout = resfn; resfn = (value: any) => { } }
-  let prev = promises.reverse()
-  let inner = prev.shift()
-  let donefn: jest.DoneCallback;
-  let func = () => {
-    inner.then(
-      (res) => { resfn(res); donefn() },
-      (rej) => { rejfn(rej); donefn() })
-  }
-  prev.forEach(p => { func = () => p.finally(func) })
-  return test(name, donfn => { donefn = donfn; func() }, timeout)
-}
+}, testTimeout+5000)
+
 // ztest("name", [], (res) => { expect(foo).toBe() })
 // test("name", done => { fn(); done(); })
 // test("name", done => inner.then(n(); done(); ) )
@@ -181,7 +224,7 @@ let rejfn = (rej: any): void => {
   console.log("%s close client: rejfn", timeStr(), rej)
 }
 
-//ztest("wss: close", [pserver, pcnxt, msg_test_p, cnx.closeP], resfn, rejfn, testTimeout )
+//ztest("wss: close", [pserver, pcnxt, msg_cnt_rcvd, closeP], resfn, rejfn, testTimeout )
 
 /** verify local socket is closed, due to closing client socket */
 test("wss: close client", close_done => {
@@ -203,7 +246,7 @@ test("wss: close client", close_done => {
   pserver.finally(() => {
     pcnxt.finally(() => {
       all_msgs_recd.finally(() => {
-        cnx.closeP.then(iff, ifr)
+        closeP.then(iff, ifr)
       })
     })
   })
@@ -213,7 +256,7 @@ test("wss: close client", close_done => {
 test("wss: close server", srv_closed => {
   pserver.finally(() => {
     pcnxt.finally(() => {
-      cnx.closeP.finally(() => {
+      closeP.finally(() => {
         let cb = (err: Error) => {
           expect(err).toBeUndefined()
           setTimeout(() => {
