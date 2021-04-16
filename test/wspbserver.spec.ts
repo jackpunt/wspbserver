@@ -16,7 +16,7 @@ const theGraid: WSSOpts = {
 var testTimeout = 8000
 
 var qtest = (name: string, fn?, timeout?) => {}
-var ztest = (name: string, promises: EzPromise<any>[], resfn?, rejfn?, timeout?: number): void => {
+var ptest = (name: string, promises: EzPromise<any>[], resfn?, rejfn?, timeout?: number): void => {
   if (typeof (rejfn) !== 'function') { timeout = rejfn; rejfn = (reason: any) => { } }
   if (typeof (resfn) !== 'function') { timeout = resfn; resfn = (value: any) => { } }
   console.log("ztest: name=%s, timeout=%s", name, timeout)
@@ -149,13 +149,13 @@ qtest("wss: connection", cnx_done => {
     })
   })
 }, testTimeout)
-// ztest("wss: zconnection", [pserver, pcnxt],
-//   (cnxHandler: TestEchoCnx) => {
-//     expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
-//     console.log("%s client connection", timeStr())
-//     cnx.setMsgTimeout(400, 50)
-//   },
-//     testTimeout)
+ptest("wss: zconnection", [ pcnxt],
+  (cnxHandler: TestEchoCnx) => {
+    expect(cnxHandler).toBeInstanceOf(TestEchoCnx)
+    console.log("%s client connection", timeStr())
+    cnx.setMsgTimeout(400, 50)
+  },
+    testTimeout)
 
 
 var simpleres = (result: any) => {
@@ -167,7 +167,7 @@ var simplerej = (reason: any) => {
   console.log("%s wss: simple", timeStr())
 }
 var simplep = new EzPromise<number>(); simplep.resolve(5)
-ztest("wss: simple", [simplep, pserver], simpleres, simplerej, testTimeout)
+ptest("wss: simple", [simplep, pserver], simpleres, simplerej, testTimeout)
 test("wss: simple test",
   donef => {
     let func = () => {

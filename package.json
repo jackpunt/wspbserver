@@ -14,7 +14,7 @@
     "cgserve": "node dist/out-tsc/CgServer.js",
     "testns": "jest --runInBand --force-exit --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
     "testwss": "jest --runInBand --force-exit --detectOpenHandles --verbose -t 'wss:'",
-    "test":   "jest --runInBand --force-exit --detectOpenHandles --verbose",
+    "test": "jest --runInBand --force-exit --detectOpenHandles --verbose",
     "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
