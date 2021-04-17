@@ -20,7 +20,7 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, S
 	/**
 	 * Send & Recieve [protobuf] messages over a WebSocket.
 	 *
-	 * @param ws the ws.WebSocket (or WebSocket or url) connection to be handled.
+	 * @param ws the ws.WebSocket (or WebSocket or url) connection to be handled. (or null)
    * Can also be a SocketSender (ie another CnxHandler)
 	 * @param msg_handler optional override PbMessage handler; default: 'this'
 	 */
@@ -39,7 +39,7 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, S
 			if (this.onmessage)
 				ws.onmessage = this.onmessage;
 		}
-		this.ws = ws;
+		this.ws = ws;  // may be null
 		this.msg_handler = msg_handler || this;
 	}
 

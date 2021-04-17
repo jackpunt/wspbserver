@@ -1,19 +1,21 @@
 syntax="proto3";
 
-/** identify the intent and contents of this message */
+/** identify the intent and contents of this message
+ * msgsToAck = [CgType.send, CgType.join, CgType.leave] 
+ */
 enum CgType {
   none = 0;
-  ack = 1;
-  send = 2;
-  join = 3;
-  leave = 4;
+  ack = 1;    // success: true/flase, client_id?: [CgServer knows the waiting_client_cnx]
+  send = 2;   // if supplied: [DM] send only to client_id (typically: 0 for ref), else: send_to_group
+  join = 3;   // req {client_id?, cause?=passcode }; ack {client_id: new-id, cause?:passcode, group?: group_name }
+  leave = 4;  // group, client_id, cause are optional [use client_id, group from socket]
 }
 /** Group protocol and carry nested message to send. */
 message CgMessage {
   CgType type = 1;       // indicates which fields are populated:
-  int32  client_id = 2;  // {leave, send, ack}; join responds with ack(client_id)
+  int32  client_id = 2;  // {leave:client-leaving, send:to-client, ack}; join responds with ack(client_id)
   bool   success = 3;    // ack: true/false
-  bytes  msg = 4;        // send: nested protobuf
+  bytes  msg = 4;        // send: nested pbMessage<INNER>
   string group = 5;      // leave, join: "group-name"
   string cause = 6;      // leave: "resign" | "robot"; ack: cause of !success; join: "client name"
 }

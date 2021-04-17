@@ -1,7 +1,6 @@
 import type { EitherWebSocket, pbMessage, PbParser } from './wspbserver';
 import { CgBaseCnx, ParserFactory } from './CgBaseCnx';
 import type { CgMessage, CgType } from './CgProto';
-import type { CnxHandler } from '.';
 
 /** 
  * A web client using CgProto (client-group.proto)

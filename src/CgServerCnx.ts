@@ -1,6 +1,6 @@
 import { CgBaseCnx } from "./CgBaseCnx";
 import { CgMessage, CgType } from "./CgProto";
-import type { pbMessage } from "./wspbserver";
+import { pbMessage, stime } from "./wspbserver";
 
 class ClientGroup extends Array<CgServerCnx> {
   aname: string;
@@ -27,22 +27,25 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
   /**
    * process an incoming message from client.
    * @param message
-   * @returns 
+   * @returns void
    * @override
    */
-  parseEval(message: CgMessage) {
+  parseEval(message: CgMessage): void {
     if (message.type != CgType.join && this.group[message.client_id] != this) {
-      this.sendNak("not a member", this.group_name)
+      this.sendNak("not a member", { group: this.group_name })
       console.log("ignore message from non-member")
       return
     }
-    if (!!this.waiting_for_ack && message.type != CgType.ack) {
-      console.log("sendNak: outstanding ack")
-      this.sendNak("outstanding ack: " + this.waiting_for_ack.type)
+    if (this.has_message_to_ack && message.type != CgType.ack) {
+      console.log("sendNak: outstanding ack, cannot do", message.type)
+      this.sendNak("need to ack: " + this.message_to_ack_type)
       return
     }
-    super.parseEval(message)
+    return super.parseEval(message)
   }
+  /**
+   * @override
+   */
   eval_ack(message: CgMessage, req: CgMessage): void {
     this.nak_count = 0;
     // handle ack of send by resolving promise (hmm, never promise_reject(cause) ?)
@@ -54,7 +57,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
    * @param req the request that is Nak'd
    * @override
    */
-  eval_nak(message: CgMessage, req: CgMessage) {
+  eval_nak(message: CgMessage, req: CgMessage): void {
     if (this.isFromReferee(message)) {
       let client = this.group.waiting_client_cnx
       client.sendToSocket(message) // forward message to originator. (no client_waiting)
@@ -67,14 +70,18 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
       } else {
         // if resend_count > N {this.promise.reject(new Error("many NAKs"))}
         // if resend_count > N {this.close/leave/robot}
-
+        console.log(stime(), "repeated client Nak:", message)
+        // TODO: send 'leave'; wait for re-join... TODO: sync re-join client with game state!
       }
     }
+    // hmm, does server care about promise_for_ack? [yes:client sync, heartbeat]
+    super.eval_nak(message, req); // resolve and clear promise_for_ack
+    return
   }
   /** on server: add to group */
   eval_join(message: CgMessage): void {
     if (this.group_name !== undefined) {
-      this.sendNak("already in group", this.group_name)
+      this.sendNak("already in group", {group: this.group_name })
       return
     }
     let join_name = message.group
@@ -89,14 +96,16 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
     this.group_name = join_name
     let client_id = this.isFromReferee(message) ? 0 : group.length
     group[client_id] = this
-    this.sendToSocket(new CgMessage({ type: CgType.ack, success: true, client_id: client_id, group: join_name }))
+    let ack = new CgMessage({ type: CgType.ack, success: true, client_id: client_id, group: join_name })
+    this.sendToSocket(ack)
     return
   }
   remove_on_ack() {
     this.group.splice(this.group.indexOf(this))
     // close group if nobody left:
     if (this.group.length === 1 && this.group[0] instanceof CgServerCnx) {
-      this.group[0].sendToSocket(new CgMessage({ type: CgType.leave, client_id: 0, cause: "all gone" }))
+      let message = new CgMessage({ type: CgType.leave, client_id: 0, cause: "all gone" })
+      this.group[0].sendToSocket(message) // CgType.leave
       return
     }
     if (this.group.length === 0) {
