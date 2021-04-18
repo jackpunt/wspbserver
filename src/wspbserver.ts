@@ -9,9 +9,9 @@ import type { CnxHandler } from "./CnxHandler";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
-declare module 'ws' {
-  export interface WebSocket extends ws { }
-}
+// declare module 'ws' {
+//   export interface WebSocket extends ws { }
+// }
 
 export interface pbMessage extends jspb.Message {}
 
