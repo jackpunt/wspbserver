@@ -1,17 +1,20 @@
 export class EzPromise<T> extends Promise<T> {
   constructor(def = (res, rej) => { }) {
-    let result: (value: T | PromiseLike<T>) => void
+    let fulfill: (value: T | PromiseLike<T>) => void
     let reject: (reason?: any) => void;
-    super((res, rej) => {
-      def(res, rej);
-      result = res;
+    super((fil, rej) => {
+      def(fil, rej);
+      fulfill = fil;
       reject = rej;
     });
-    this.resolve = result
-    this.reject = reject
+    this.fulfill = (value: T | PromiseLike<T>) => { this.value = value; this.resolved= true; fulfill(value) }
+    this.reject = (reason: any) => {this.reason = reason; this.resolved = true; reject(reason)}
   }
-  resolve: (value: T | PromiseLike<T>) => void;
+  fulfill: (value: T | PromiseLike<T>) => void;
   reject: (value: any) => void;
+  value: T | PromiseLike<T>;
+  reason: any;
+  resolved: boolean;
 }
 // https://gist.github.com/oliverfoster/00897f4552cef64653ef14d8b26338a6
 // with the trick to supply/invoke a default/dummy method arg.

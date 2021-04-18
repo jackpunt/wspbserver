@@ -225,7 +225,7 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
    */
   eval_ack(message: CgMessage, req: CgMessage): void {
     if (!!this.promise_of_ack) {
-      this.promise_of_ack.resolve(message);
+      this.promise_of_ack.fulfill(message);
       this.promise_of_ack = undefined  // invalidate this.promise_of_ack
     }
     return
@@ -236,7 +236,7 @@ export class CgBaseCnx<INNER extends pbMessage, OUTER extends CgMessage> extends
    */
   eval_nak(message: CgMessage, req: CgMessage) {
     if (!!this.promise_of_ack) {
-      this.promise_of_ack.resolve(message);
+      this.promise_of_ack.fulfill(message);
       this.promise_of_ack = undefined  // invalidate this.promise_of_ack
     }
     return

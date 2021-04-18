@@ -22,5 +22,14 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
     },
+    {
+      "type": "pwa-node",
+      "request": "launch",
+      "name": "Jest run ns: tests",
+      "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
+      "args": ["--verbose", "-i", "--no-cache", "--testPathIgnorePatterns=wspbserver.spec"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    },
   ]
 }
