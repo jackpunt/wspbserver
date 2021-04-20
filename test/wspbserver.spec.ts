@@ -131,7 +131,10 @@ test("wss: make server", () => {
 test("wss: server listening", () => {
   return server.startListening().then((server_also) => {
     console.log(stime(), "Server Listening")
+    expect(server_also).toBe(server)
     pserver.fulfill(server)
+  }, (reason) => {
+    fail(reason)
   }).catch((reason: Error) => {
     console.log(stime(), "Listen failed:", reason.message)
   })
