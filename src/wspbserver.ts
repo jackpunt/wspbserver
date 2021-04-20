@@ -130,35 +130,19 @@ export class CnxListener {
 		return new ws.Server(Object.assign({}, opts, {server: httpsServer}));
 	}
 	/** 
-	 * Promise fulfills when server is Listening; rejects if error (EADDRINUSE). 
+	 * Promise fulfills when server is Listening; rejects if error (ex: EADDRINUSE). 
 	 * @return EzPromise\<this\> where this.wss is the ws.Server
 	 */
 	make_wss_server(host: string, port: number): EzPromise<this> {
 		// console.log('%s try listen on %s:%d', moment().format(fmt), host, port);
 		// pass in your express app and credentials to create an https server
-		let wss: ws.Server
 		let pserver = new EzPromise<this>()
-		// try {
 		let httpsServer = https.createServer(this.credentials, undefined)
-		httpsServer.on('error', (error: Error) => {
-			//console.log(stime(), "httpsServer.listen failed:", error)
-			pserver.reject(error)
-		})
-		//console.log('%s listening on %s:%d', stime(), host, port);
-		wss = this.wss = this.wssUpgrade(httpsServer)
-
-		httpsServer.on('listening', () => { pserver.fulfill(this) })
-		//console.log('%s try listen on %s:%d', stime(), host, port);
-		let listener = httpsServer.listen(port, host);
-		listener.on('error', (error: Error) => {
-			//console.log(stime(), "Https listener failed:", error)
-			pserver.reject(error)
-		})
-		//console.log('%s starting: wss=%s', stime(), wss);
+		let wss = this.wss = this.wssUpgrade(httpsServer)
+		wss.on('error', (error: Error)=>{ pserver.reject(error) })
+		wss.on('listening', () => { pserver.fulfill(this) })
 		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
-		// } catch (error) {
-		// 	console.log(stime(), "Server startup failed:", error)
-		// }
+		httpsServer.listen(port, host);
 		return pserver;
 	}
 	/** All server-listeners or on Node.js, using ws.WebSocket. */
