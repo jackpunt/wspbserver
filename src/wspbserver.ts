@@ -6,6 +6,7 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import type { CnxHandler } from "./CnxHandler";
+import { EzPromise } from "./EzPromise";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
@@ -100,9 +101,12 @@ export class CnxListener {
     this.cnxFactory = cnxFactory
   }
 	
-	startListening() {
-    this.run_server(this.hostname, this.port)
-    //this.dnsLookup(this.hostname, (addr,fam)=>{this.run_server(addr, this.port)})
+	/** 
+	 * Promise fulfills when server is Listening; rejects if error (EADDRINUSE). 
+	 * @return EzPromise\<this\> where this.wss is the ws.Server
+	 */
+	startListening(): EzPromise<this> {
+		return this.make_wss_server(this.hostname, this.port)
 	}
 	/** https.Server.listen(host, port) does not require DNS addr */
   dnsLookup(hostname: string, callback: (addr: string, fam: number) => void, thisArg: any = this) {
@@ -125,14 +129,37 @@ export class CnxListener {
 	wssUpgrade(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
 		return new ws.Server(Object.assign({}, opts, {server: httpsServer}));
 	}
-	make_wss_server(host: string, port: number): ws.Server {
+	/** 
+	 * Promise fulfills when server is Listening; rejects if error (EADDRINUSE). 
+	 * @return EzPromise\<this\> where this.wss is the ws.Server
+	 */
+	make_wss_server(host: string, port: number): EzPromise<this> {
 		// console.log('%s try listen on %s:%d', moment().format(fmt), host, port);
 		// pass in your express app and credentials to create an https server
-		let httpsServer = https.createServer(this.credentials, undefined).listen(port, host);
-		// console.log('%s listening on %s:%d', moment().format(fmt), host, port);
-		const wss = this.wssUpgrade(httpsServer)
-		console.log('%s starting: wss=%s', moment().format(fmt), wss);
-		return wss;
+		let wss: ws.Server
+		let pserver = new EzPromise<this>()
+		// try {
+		let httpsServer = https.createServer(this.credentials, undefined)
+		httpsServer.on('error', (error: Error) => {
+			//console.log(stime(), "httpsServer.listen failed:", error)
+			pserver.reject(error)
+		})
+		//console.log('%s listening on %s:%d', stime(), host, port);
+		wss = this.wss = this.wssUpgrade(httpsServer)
+
+		httpsServer.on('listening', () => { pserver.fulfill(this) })
+		//console.log('%s try listen on %s:%d', stime(), host, port);
+		let listener = httpsServer.listen(port, host);
+		listener.on('error', (error: Error) => {
+			//console.log(stime(), "Https listener failed:", error)
+			pserver.reject(error)
+		})
+		//console.log('%s starting: wss=%s', stime(), wss);
+		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
+		// } catch (error) {
+		// 	console.log(stime(), "Server startup failed:", error)
+		// }
+		return pserver;
 	}
 	/** All server-listeners or on Node.js, using ws.WebSocket. */
   connection(ws: ws.WebSocket, req: http.IncomingMessage) {
@@ -149,11 +176,6 @@ export class CnxListener {
     ws.on('message', (buf: DataBuf) => this.cnxHandler.wsmessage(buf));
     // QQQQ: do we need to invoke: this.cnxHandler.open() ??
   }
-
-	run_server(host: string, port: number = this.port) {
-		this.wss = this.make_wss_server(host, port)
-		this.wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
-	}
 }
 
 

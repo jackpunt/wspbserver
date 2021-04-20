@@ -79,13 +79,13 @@ export class CnxHandler<T extends pbMessage> implements WebSocketEventHandler, S
 
 	// Basically abstract methods:
 	onopen(ev: Event) {
-		console.log('%s open:', moment().format(fmt), ev);
+		console.log('%s onopen:', moment().format(fmt), ev);
 	}
 	onclose(ev: Event) {
-		console.log('%s close:', moment().format(fmt), ev);
+		console.log('%s onclose:', moment().format(fmt), ev);
 	}
 	onerror(ev: Event) {
-		console.log('%s error:', moment().format(fmt), ev);
+		console.log('%s onerror:', moment().format(fmt), ev);
 		if (typeof (this.sendError) === 'function')
 			this.sendBuffer.call(this, ev);
 	}

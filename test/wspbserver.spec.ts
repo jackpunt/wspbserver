@@ -109,28 +109,38 @@ pserver.catch((reason: any) => {
   console.log(stime(), "pserver.catch: reason=", reason)
 })
 // console.log(stime(), "pserver", pserver)
-var server: CnxListener;
+
 /** set when CnxHandler is created. */
 var pcnxt = new EzPromise<TestEchoCnx>();
-pcnxt.catch((reason) => { console.log(stime(), "pcnxt-catch:", reason) })
-pcnxt.catch((reason) => { msg_cnt_rcvd.reject(reason) })
+pcnxt.catch((reason) => { 
+  console.log(stime(), "pcnxt-catch:", reason) 
+  msg_cnt_rcvd.reject(reason) 
+})
 
 var cnxFactory: CnxFactory = (ws: EitherWebSocket) => {
   testEchoCnx.ws = ws;
   pcnxt.fulfill(testEchoCnx)
   return testEchoCnx
 }
+const server: CnxListener = new CnxListener("game7", theGraid, cnxFactory);
 test("wss: make server", () => {
-  server = new CnxListener("game7", theGraid, cnxFactory)
+  console.log(stime(), "make server:", server.hostname, "wss=", server.wss)
   expect(server).toBeInstanceOf(CnxListener)
-  server.startListening()
-  console.log(stime(), "Ready for client connection")
-  pserver.fulfill(server)
+})
+
+test("wss: server listening", () => {
+  return server.startListening().then((server_also) => {
+    console.log(stime(), "Server Listening")
+    pserver.fulfill(server)
+  }).catch((reason: Error) => {
+    console.log(stime(), "Listen failed:", reason.message)
+  })
 }, 1000)
 
 test("wss: connection", done => {
   //pcnxt.then(() => done())
   setTimeout(() => {
+    if (!pcnxt.resolved) console.log(stime(), "wss: connection -- timeout, no client")
     pcnxt.reject(close_failure)
   }, testTimeout - 300)
   pcnxt.then((cnxHandler: TestEchoCnx) => {
@@ -188,6 +198,9 @@ describe("closing", () => {
     closeP.finally(() => {
       // wait a bit, then close server socket:
       // setTimeout(() => {
+      // console.log(stime(), "close server", server)
+      // console.log(stime(), "close server", server.wss)
+      // console.log(stime(), "close server", server.wss.clients)
       console.log(stime(), "close server", server.wss.clients.size)
       server.wss.close((err: Error) => {
         expect(err).toBeUndefined()

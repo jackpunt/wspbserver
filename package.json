@@ -18,7 +18,7 @@
     "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
-    "build": "npm run clean; npm run protots; npm run tsc"
+    "build": "npm run clean; npm run protots; npm run patch; npm run tsc"
   },
   "repository": {
     "type": "git",
