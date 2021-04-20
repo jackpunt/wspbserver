@@ -1,6 +1,6 @@
 {
   "name": "wspbserver",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "WebSocket Protobuf Server",
   "main": "dist/out-tsc/index.js",
   "files": [
