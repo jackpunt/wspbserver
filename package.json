@@ -40,10 +40,12 @@
   "homepage": "https://github.com/jackpunt/wspbserver#readme",
   "dependencies": {
     "@thegraid/ezpromise": "^1.0.4",
+    "chrome-launcher": "^0.13.4",
     "google-protobuf": "*",
     "moment": "^2.29.1",
     "tslib": "^2.1.0",
-    "ws": "^7.4.4"
+    "ws": "^7.4.4",
+    "wspbclient": "^1.2.11"
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.4",
