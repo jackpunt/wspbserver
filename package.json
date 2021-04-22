@@ -7,7 +7,10 @@
     "dist/out-tsc"
   ],
   "scripts": {
-    "patch": "replace 'serializeBinary(): Uint8Array { throw new Error(\"Method not implemented.\"); }' 'serializeBinary(): Uint8Array { return this.serialize(); }\n    static deserializeBinary(bytes: Uint8Array): CgMessage { return CgMessage.deserialize(bytes); }' -- src/CgProto.ts ",
+    "patch-serial": "replace 'serializeBinary(): Uint8Array { throw new Error(\"Method not implemented.\"); }' 'serializeBinary(): Uint8Array { return this.serialize(); }' -- src/*Proto.ts",
+    "patch-return": "replace 'return writer.getResultBuffer();' 'return writer.getResultBuffer();\n        return undefined;' -- src/*Proto.ts",
+    "patch-reader": "replace -s 'Uint8Array ? new pb_1.BinaryReader(bytes) : bytes' 'pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes)' --  src/*Proto.ts",
+    "patch": "npm run patch-reader; npm run patch-return; npm run patch-serial",
     "protojs": "protoc -I src/proto --js_out=import_style=commonjs,binary:. src/proto/*.proto",
     "protots": "protoc -I src/proto --ts_out=src src/proto/*.proto",
     "echo": "node dist/out-tsc/echoserver.js",
@@ -36,6 +39,7 @@
   },
   "homepage": "https://github.com/jackpunt/wspbserver#readme",
   "dependencies": {
+    "@thegraid/ezpromise": "^1.0.4",
     "google-protobuf": "*",
     "moment": "^2.29.1",
     "tslib": "^2.1.0",

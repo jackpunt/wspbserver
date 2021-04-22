@@ -2,7 +2,7 @@ import type { DataBuf, EitherWebSocket, pbMessage, PbParser } from "./wspbserver
 import { stime } from "./wspbserver";
 import { CgMessage, CgType } from "./CgProto";
 import { CnxHandler } from "./CnxHandler";
-import { EzPromise } from "./EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 
 
 export type ParserFactory<INNER extends pbMessage, OUTER extends CgMessage> 

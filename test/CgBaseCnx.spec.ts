@@ -1,5 +1,5 @@
 import { CgBaseCnx } from '../src/CgBaseCnx'
-import { EzPromise } from "../src/EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 const moment = require('moment');
 
 var base = new CgBaseCnx(null, null)

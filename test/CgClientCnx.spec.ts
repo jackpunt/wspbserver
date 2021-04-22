@@ -2,7 +2,7 @@ import { CnxHandler } from '../src/CnxHandler';
 import { CgClientCnx } from '../src/CgClientCnx'
 import type { CgMessage } from '../src/CgProto';
 import type { CgBaseCnx, ParserFactory } from '../src/CgBaseCnx';
-import { EzPromise } from "../src/EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 const moment = require('moment');
 
 var inner_fac: ParserFactory<never, CgMessage> = (cnx: CgBaseCnx<never, CgMessage>) => {

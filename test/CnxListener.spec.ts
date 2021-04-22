@@ -1,6 +1,6 @@
 import { CnxListener } from "../src/wspbserver";
 import { EchoCnx } from '../src/EchoCnx'
-import { EzPromise } from "../src/EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 const moment = require('moment');
 
 const wssOpts = {

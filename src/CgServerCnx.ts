@@ -96,8 +96,9 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
     this.group_name = join_name
     let client_id = this.isFromReferee(message) ? 0 : group.length
     group[client_id] = this
-    let ack = new CgMessage({ type: CgType.ack, success: true, client_id: client_id, group: join_name })
-    this.sendToSocket(ack)
+    // let ack = new CgMessage({ type: CgType.ack, success: true, client_id: client_id, group: join_name })
+    // this.sendToSocket(ack)
+    this.sendAck("joined", {client_id, group: join_name})
     return
   }
   remove_on_ack() {

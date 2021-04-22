@@ -6,7 +6,7 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import type { CnxHandler } from "./CnxHandler";
-import { EzPromise } from "./EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 

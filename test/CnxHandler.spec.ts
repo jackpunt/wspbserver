@@ -1,5 +1,5 @@
 import { CnxHandler } from "../src/CnxHandler";
-import { EzPromise } from "../src/EzPromise";
+import { EzPromise } from "@thegraid/EzPromise";
 const moment = require('moment');
 
 var cnx = new CnxHandler(null)

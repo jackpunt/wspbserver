@@ -1,8 +1,8 @@
 import { CLOSE_CODE, CnxFactory, CnxListener, DataBuf, EitherWebSocket, pbMessage, stime, WSSOpts } from "../src/wspbserver";
 import { EchoCnx } from '../src/EchoCnx'
-import { EzPromise } from "../src/EzPromise";
+import { EzPromise } from "@thegraid/ezpromise";
 
-const theGraid: WSSOpts = {
+const gammaNg: WSSOpts = {
   domain: ".thegraid.com",
   port: 8443,
   keydir: "/Users/jpeck/keys/"
@@ -35,7 +35,7 @@ class TestEchoCnx extends EchoCnx {
 
   /** Promise filled when all Promise<message> filled; rejected when any Promise<message> is rejected. */
   promiseAll: Promise<DataBuf[]>;
-  msgP: EzPromise<DataBuf>[] = Array<EzPromise<DataBuf>>()
+  msgP: EzPromise<DataBuf>[] = Array<EzPromise<DataBuf>>() // managed by countP() [below]
   msgMax: number = 3;    // decrement to 0 -> 
   msgCount: number = 0;  // increment 
   setMsgCount(n: number) {
@@ -101,7 +101,7 @@ testEchoCnx = new TestEchoCnx(null, null, 3); // Promises: testEchoCnx.msgP[3], 
 
 // console.log(stime(), "Start Test")
 test("wss: WSSOpts", () => {
-  expect(Object.entries(theGraid).length).toEqual(3);
+  expect(Object.entries(gammaNg).length).toEqual(3);
 })
 
 var pserver = new EzPromise<CnxListener>()
@@ -122,7 +122,7 @@ var cnxFactory: CnxFactory = (ws: EitherWebSocket) => {
   pcnxt.fulfill(testEchoCnx)
   return testEchoCnx
 }
-const server: CnxListener = new CnxListener("game7", theGraid, cnxFactory);
+const server: CnxListener = new CnxListener("game7", gammaNg, cnxFactory);
 test("wss: make server", () => {
   console.log(stime(), "make server:", server.hostname, "wss=", server.wss)
   expect(server).toBeInstanceOf(CnxListener)
@@ -176,7 +176,7 @@ describe("messages received", () => {
 
 describe("closing", () => {
   /** verify local socket closed cleanly */
-  test("wss: close client", done =>
+  test("wss: client closed", done =>
     closeP.then((result: CloseInfo) => {
       console.log(stime(), "close client: resfn result=", result)
       let close_code = CLOSE_CODE.NormalCLosure
@@ -197,7 +197,7 @@ describe("closing", () => {
     , testTimeout + 50)
 
 
-  test("wss: close server", srv_closed => {
+  test("wss: server closed", srv_closed => {
     closeP.finally(() => {
       // wait a bit, then close server socket:
       // setTimeout(() => {

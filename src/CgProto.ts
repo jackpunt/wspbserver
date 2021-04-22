@@ -88,11 +88,11 @@ export class CgMessage extends pb_1.Message {
             writer.writeString(6, this.cause);
         if (!w)
             return writer.getResultBuffer();
+        return undefined;
     }
     serializeBinary(): Uint8Array { return this.serialize(); }
-    static deserializeBinary(bytes: Uint8Array): CgMessage { return CgMessage.deserialize(bytes); }
     static deserialize(bytes: Uint8Array | pb_1.BinaryReader): CgMessage {
-        const reader = bytes instanceof Uint8Array ? new pb_1.BinaryReader(bytes) : bytes, message = new CgMessage();
+        const reader = bytes instanceof pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes), message = new CgMessage();
         while (reader.nextField()) {
             if (reader.isEndGroup())
                 break;
