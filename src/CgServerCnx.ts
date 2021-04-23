@@ -1,6 +1,4 @@
-import { CgBaseCnx } from "./CgBaseCnx";
-import { CgMessage, CgType } from "./CgProto";
-import { pbMessage, stime } from "./wspbserver";
+import { AckPromise, CgBase, CgMessage, CgType, pbMessage, stime } from "wspbclient";
 
 class ClientGroup extends Array<CgServerCnx> {
   aname: string;
@@ -9,7 +7,7 @@ class ClientGroup extends Array<CgServerCnx> {
 }
 
 /** Server-side Client-Group connection handler. */
-export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
+export class CgServerCnx extends CgBase<CgMessage> {
   static groups: Record<string, ClientGroup> // Map(group-name:string => CgMessageHanlder[])
 
   group_name: string;  // group to which this connection is join'd
@@ -91,7 +89,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
       group.aname = message.cause; // for ease of debug reference
       console.log("CgServer.eval_join: new Group", group)
       CgServerCnx.groups[join_name] = group
-      group[0] = new CgAutoAckCnx(this) // TODO: spawn a referee, let it connect
+      group[0] = new CgAutoAckCnx() // TODO: spawn a referee, let it connect
     }
     this.group_name = join_name
     let client_id = this.isFromReferee(message) ? 0 : group.length
@@ -111,7 +109,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
     }
     if (this.group.length === 0) {
       delete CgServerCnx.groups[this.group_name]
-      this.ws.close(0, "all gone")
+      this.closeStream(0, "all gone")
     }
   }
   /** client leaving; inform others? */
@@ -145,7 +143,7 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
   sendToReferee(msg: CgMessage): Promise<CgMessage> {
     // use auto-ref until there is a better connection.
     if (!(this.group[0] instanceof CgServerCnx)) {
-      this.group[0] = new CgAutoAckCnx(this)
+      this.group[0] = new CgAutoAckCnx()
     }
     return this.group[0].sendToSocket(msg)
   }
@@ -172,21 +170,19 @@ export class CgServerCnx extends CgBaseCnx<pbMessage, CgMessage> {
   }
 }
 
-/** in-process "connection" that immediately Acks any message that needs it. */
+/** in-process Referee "connection" that immediately Acks any message that needs it. */
 class CgAutoAckCnx extends CgServerCnx {
-  constructor(public server: CgServerCnx) {
-    super(null, null) // no websocket, no inner_msg_handler
-  }
   /** 
    * No actual Socket; don't 'send' anything.
    * @return a Promise<Ack> that is resolved.
    */
-  sendToSocket(message: CgMessage): Promise<CgMessage> {
+  sendToSocket(message: CgMessage): AckPromise {
+    let rv = new AckPromise(message)
+    let ack: CgMessage = null;
     if (CgServerCnx.msgsToAck.includes(message.type)) {
-      let ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
-      return Promise.resolve(ack)
-    } else {
-      return null; // ignore other [ack, none] messages; nobody expects a Promise<CgMessage> from them.
+      ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
     }
+    rv.fulfill(ack)
+    return rv
   }
 }

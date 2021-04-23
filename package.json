@@ -7,12 +7,6 @@
     "dist/out-tsc"
   ],
   "scripts": {
-    "patch-serial": "replace 'serializeBinary(): Uint8Array { throw new Error(\"Method not implemented.\"); }' 'serializeBinary(): Uint8Array { return this.serialize(); }' -- src/*Proto.ts",
-    "patch-return": "replace 'return writer.getResultBuffer();' 'return writer.getResultBuffer();\n        return undefined;' -- src/*Proto.ts",
-    "patch-reader": "replace -s 'Uint8Array ? new pb_1.BinaryReader(bytes) : bytes' 'pb_1.BinaryReader ? bytes : new pb_1.BinaryReader(bytes)' --  src/*Proto.ts",
-    "patch": "npm run patch-reader; npm run patch-return; npm run patch-serial",
-    "protojs": "protoc -I src/proto --js_out=import_style=commonjs,binary:. src/proto/*.proto",
-    "protots": "protoc -I src/proto --ts_out=src src/proto/*.proto",
     "echo": "node dist/out-tsc/echoserver.js",
     "cgserve": "node dist/out-tsc/cg-server.js",
     "testns": "jest --runInBand --force-exit --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
@@ -21,7 +15,7 @@
     "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
-    "build": "npm run clean; npm run protots; npm run patch; npm run tsc"
+    "build": "npm run clean; npm run tsc"
   },
   "repository": {
     "type": "git",

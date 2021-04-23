@@ -5,7 +5,6 @@ import * as dns from "dns";
 import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
-import type { CnxHandler } from "./CnxHandler";
 import { EzPromise } from "@thegraid/EzPromise";
 
 
@@ -33,10 +32,9 @@ export interface  WSSOpts { domain: string, port: number, keydir: string, }
 export type Credentials = https.ServerOptions // {key: string, cert: string}
 export type DataBuf = Buffer | Uint8Array
 export interface SocketSender { sendBuffer(bytes: DataBuf, cb?: (error: Event | Error) => void): void }
-export type EitherWebSocket = WebSocket | ws.WebSocket
-export type CnxFactory = (ws: EitherWebSocket) => CnxHandler<pbMessage>;
+export type CnxFactory = (ws: ws.WebSocket, request?: http.IncomingMessage) => void;
 export const fmt = "YYYY-MM-DD kk:mm:ss.SSS"
-export function stime () { return moment().format(fmt)}
+export function stime() { return moment().format(fmt)}
 
 export interface WsServerOptions extends ws.ServerOptions {
 	host?: string, port?: number, 
@@ -80,7 +78,6 @@ export class CnxListener {
 	certpath: string = this.keydir + this.basename + '.cert.pem'
 	credentials: Credentials
 	cnxFactory: CnxFactory;
-	cnxHandler: CnxHandler<pbMessage>;
 	wss: ws.Server
   /**
    * 
@@ -141,24 +138,17 @@ export class CnxListener {
 		let wss = this.wss = this.wssUpgrade(httpsServer)
 		wss.on('error', (error: Error)=>{ pserver.reject(error) })
 		wss.on('listening', () => { pserver.fulfill(this) })
-		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.connection(ws, req));
+		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.onconnection(ws, req));
 		httpsServer.listen(port, host);
 		return pserver;
 	}
 	/** All server-listeners or on Node.js, using ws.WebSocket. */
-  connection(ws: ws.WebSocket, req: http.IncomingMessage) {
+  onconnection(ws: ws.WebSocket, req: http.IncomingMessage) {
     let remote_addr: string = req.socket.remoteAddress
     let remote_port: number = req.socket.remotePort
     let remote_family: string = req.socket.remoteFamily
     let remote = {addr: req.socket.remoteAddress, port: req.socket.remotePort, family: req.socket.remoteFamily}
-    this.cnxHandler = this.cnxFactory(ws)
-
-		// for incoming/server connections, use ws.WebSocket interface:
-    ws.on('open', (ev: Event) => this.cnxHandler.onopen(ev));
-    ws.on('close', (ev: Event) => this.cnxHandler.onclose(ev));
-    ws.on('error', (ev: Event) => this.cnxHandler.onerror(ev));
-    ws.on('message', (buf: DataBuf) => this.cnxHandler.wsmessage(buf));
-    // QQQQ: do we need to invoke: this.cnxHandler.open() ??
+    let cnxHandler = this.cnxFactory(ws, req)
   }
 }
 

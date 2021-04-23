@@ -1,23 +1,22 @@
-import * as moment from 'moment';
-import { CnxHandler } from "./CnxHandler";
-import { pbMessage, DataBuf, stime } from "./wspbserver";
+import { pbMessage, DataBuf, stime, BaseDriver } from "wspbclient";
 
 /** A CnxHandler that handles incoming(buf) by sending it back to this.ws */
 
-export class EchoCnx extends CnxHandler<pbMessage> {
+export class EchoCnx<T extends pbMessage> extends BaseDriver<T, T> {
 	/**
 	 * Override to avoid deserialize, parseEval
 	 * @param buf
 	 * @override
 	 */
-	wsmessage(buf: DataBuf) {
+	wsmessage(buf: DataBuf<T>) {
 		this.wsreceived(buf)
 		this.wsechoback(buf);
 	}
-	wsreceived(buf: DataBuf) {
+	wsreceived(buf: DataBuf<T>) {
 		console.log(stime(), "RECEIVED:", buf.length, buf);
 	}
-	wsechoback(buf: DataBuf) {
+	wsechoback(buf: DataBuf<T>) {
+		// TODO: see if this is needed and find generic solution, see also CgBase.ts
 		let sendBufCb = (error: Error) => {
 			if (!error) {
 				console.log(stime(), 'EchoCnx sent: %s', "success");
@@ -25,6 +24,6 @@ export class EchoCnx extends CnxHandler<pbMessage> {
 				console.log(stime(), 'EchoCnx error: %s', error);
 			}
 		};
-		this.sendBuffer(buf, sendBufCb);
+		this.sendBuffer(buf);
 	}
 }
