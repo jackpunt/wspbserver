@@ -8,12 +8,8 @@ const cgserve: WSSOpts = {
 	port: 8444,
 	keydir: "/Users/jpeck/keys/"
 }
-function newClient(ws: ws.WebSocket) {
-	let wsb = new ServerSocketDriver()
-	wsb.connectWebSocket(ws)
-	wsb.connectStream(ws, CgServerCnx)
-}
-let cnxlp = new CnxListener("game7", cgserve, newClient).startListening()
+
+let cnxlp = new CnxListener("game7", cgserve, ServerSocketDriver, CgServerCnx ).startListening()
 cnxlp.then((cnxl) => {
 	console.log("listening %s:%d", cnxl.hostname, cnxl.port)
 }, (reason) => {

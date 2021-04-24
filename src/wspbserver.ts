@@ -6,6 +6,8 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import { EzPromise } from "@thegraid/EzPromise";
+import type { ServerSocketDriver } from "./CnxHandler";
+import type { AnyWSD } from "wspbclient";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
@@ -79,15 +81,18 @@ export class CnxListener {
 	credentials: Credentials
 	cnxFactory: CnxFactory;
 	wss: ws.Server
-  /**
-   * 
-   * @param basename identifies the hostname and the key/cert alias
-   * @param wssOpts 
-   * @param cnxHanlder a class of CnxHandler: new cnxHanlder(ws)
-   * @param cnxFactory (ws) => CnxHandler; must supply cnxHandler == undefined
-   */
-  constructor(basename: string, wssOpts: WSSOpts, cnxFactory: CnxFactory ) {
-    let { domain, port, keydir } = wssOpts
+
+	/**
+	 * Listen for connections; make stream from WSB up through Drivers
+	 * @param basename identifies the hostname and the key/cert alias
+	 * @param wssOpts {domain, port, keypath}
+	 * @param WSB a ServerSocketDriver
+	 * @param Drivers any stackable WebSocketDriver
+	 */
+	constructor(basename: string, wssOpts: WSSOpts,
+		WSB: { new(): ServerSocketDriver<pbMessage> },
+		...Drivers: (new () => AnyWSD)[]) {
+		let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
     this.keypath = this.keydir + basename + '.key.pem';
@@ -95,7 +100,14 @@ export class CnxListener {
     this.hostname = basename + domain;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
 
-    this.cnxFactory = cnxFactory
+		this.cnxFactory = (ws: ws.WebSocket, request?: http.IncomingMessage) => {
+			let remote_addr: string = request.socket.remoteAddress
+			let remote_port: number = request.socket.remotePort
+			let remote_family: string = request.socket.remoteFamily
+			let remote = { addr: request.socket.remoteAddress, port: request.socket.remotePort, family: request.socket.remoteFamily }
+			let wsb = new WSB() as ServerSocketDriver<pbMessage>
+			wsb.connectStream(ws, ...Drivers)
+		}
   }
 	
 	/** 
@@ -143,12 +155,8 @@ export class CnxListener {
 		return pserver;
 	}
 	/** All server-listeners or on Node.js, using ws.WebSocket. */
-  onconnection(ws: ws.WebSocket, req: http.IncomingMessage) {
-    let remote_addr: string = req.socket.remoteAddress
-    let remote_port: number = req.socket.remotePort
-    let remote_family: string = req.socket.remoteFamily
-    let remote = {addr: req.socket.remoteAddress, port: req.socket.remotePort, family: req.socket.remoteFamily}
-    let cnxHandler = this.cnxFactory(ws, req)
+  onconnection(ws: ws.WebSocket, request: http.IncomingMessage) {
+    this.cnxFactory(ws, request)
   }
 }
 
