@@ -39,7 +39,7 @@
     "moment": "^2.29.1",
     "tslib": "^2.1.0",
     "ws": "^7.4.4",
-    "wspbclient": "^1.2.11"
+    "wspbclient": "^1.3.1"
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.4",
