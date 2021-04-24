@@ -8,7 +8,7 @@
       "type": "pwa-node",
       "request": "launch",
       "name": "cg-server",
-      "program": "dist/out-tsc/cg-server.js",
+      "program": "dist/cg-server.js",
       "args": [""],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "dist/out-tsc",
+    "outDir": "dist",
     "lib": ["es2018", "dom"],
     "moduleResolution": "node",
     "sourceMap": true,

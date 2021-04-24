@@ -2,19 +2,19 @@
   "name": "wspbserver",
   "version": "1.3.1",
   "description": "WebSocket Protobuf Server",
-  "main": "dist/out-tsc/index.js",
+  "main": "dist/index.js",
   "files": [
-    "dist/out-tsc"
+    "dist"
   ],
   "scripts": {
-    "echo": "node dist/out-tsc/echoserver.js",
-    "cgserver": "node dist/out-tsc/cg-server.js",
+    "echo": "node dist/echoserver.js",
+    "cgserver": "node dist/cg-server.js",
     "testns": "jest --runInBand --force-exit --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
     "testwss": "jest --runInBand --force-exit --detectOpenHandles --verbose -t 'wss:'",
     "test": "jest --runInBand --force-exit --detectOpenHandles --verbose",
     "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
-    "clean": "rm -f dist/out-tsc/*",
+    "clean": "rm -f dist/*",
     "reserve": "npm run build; npm run cgserver",
     "build": "npm run clean; npm run tsc"
   },
