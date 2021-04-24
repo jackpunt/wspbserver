@@ -3,19 +3,15 @@ import * as https from "https";
 import type * as http from "http";
 import * as dns from "dns";
 import * as ws from "ws";
-import * as moment from 'moment';
-import type * as jspb from 'google-protobuf';
 import { EzPromise } from "@thegraid/EzPromise";
 import { ServerSocketDriver } from "./CnxHandler";
-import type { AnyWSD } from "wspbclient";
+import type { AnyWSD, stime, pbMessage } from "wspbclient";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
 declare module 'ws' {
   export interface WebSocket extends ws { }
 }
-
-export interface pbMessage extends jspb.Message {}
 
 // node_modules/ws/lib/constants: BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
 export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
@@ -32,12 +28,10 @@ export interface  WSSOpts { domain: string, port: number, keydir: string, }
 
 /** a subset of https.ServerOptions */
 export type Credentials = https.ServerOptions // {key: string, cert: string}
-export type DataBuf = Buffer | Uint8Array
-export interface SocketSender { sendBuffer(bytes: DataBuf, cb?: (error: Event | Error) => void): void }
-export type CnxFactory = (ws: ws.WebSocket, request?: http.IncomingMessage) => void;
-export const fmt = "YYYY-MM-DD kk:mm:ss.SSS"
-export function stime() { return moment().format(fmt)}
 
+/** Reminder of options that 'ws' makes available, 
+ * WssListener default sets binaryType: 'arraybuffer' 
+ */
 export interface WsServerOptions extends ws.ServerOptions {
 	host?: string, port?: number, 
 	backlog?: number,
@@ -52,34 +46,22 @@ export interface WsServerOptions extends ws.ServerOptions {
 	binaryType?: BINARY_TYPES,
 }
 
-/** standard HTML [Web]Socket events, for client (& server ws.WebSocket) */
-export interface WebSocketEventHandler {
-	onopen: (ev: Event) => void | null;  // { target: WebSocket }
-	onerror: (ev: Event) => void | null; // { target: WebSocket, error: any, message: any, type: string }
-	onclose: (ev: CloseEvent) => void | null; // { target: WebSocket, wasClean: boolean, code: number, reason: string; }
-	onmessage: (ev: MessageEvent) => void | null; // { target: WebSocket, data: any, type: string }
-	wsmessage: (buf: DataBuf) => void | null; // from ws.WebSocket Node.js server (buf: {any[] | Buffer })
-}
-
-export interface PbParser<T extends pbMessage> {
-	deserialize(bytes: DataBuf): T
-	parseEval(message:T, ...args:any): void;
-}
 /**
  * a Secure WebSocket Listener (wss://)
  * Listening for connections on the given wss://host.domain:port/ [secured by keydir] 
  * 
  */
-export class CnxListener {
+export class WssListener {
 	basename: string = "localhost"
 	domain: string = ".local"
 	hostname: string = this.basename + this.domain
 	port: number = 8443;
-	keydir = "/Users/jpeck/keys/";
-	keypath: string = this.keydir + this.basename + '.key.pem'
-	certpath: string = this.keydir + this.basename + '.cert.pem'
+	keydir: string;
+	keypath: string;
+	certpath: string;
 	credentials: Credentials
-	cnxFactory: CnxFactory;
+	WSB: (new () => ServerSocketDriver<pbMessage>) = ServerSocketDriver;
+	drivers: (new()=>AnyWSD)[]
 	wss: ws.Server
 
 	/**
@@ -96,15 +78,7 @@ export class CnxListener {
     this.certpath = this.keydir + basename + '.cert.pem';
     this.hostname = basename + domain;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
-
-		this.cnxFactory = (ws: ws.WebSocket, request?: http.IncomingMessage) => {
-			let remote_addr: string = request.socket.remoteAddress
-			let remote_port: number = request.socket.remotePort
-			let remote_family: string = request.socket.remoteFamily
-			let remote = { addr: request.socket.remoteAddress, port: request.socket.remotePort, family: request.socket.remoteFamily }
-			let wsb = new ServerSocketDriver<pbMessage>()
-			wsb.connectStream(ws, ...Drivers)
-		}
+		this.drivers = Drivers
   }
 	
 	/** 
@@ -151,9 +125,22 @@ export class CnxListener {
 		httpsServer.listen(port, host);
 		return pserver;
 	}
-	/** All server-listeners or on Node.js, using ws.WebSocket. */
+	
+	/**
+	 * Invoked for each new connection to this server.
+	 * 
+	 * new this.WSB().connectStream(ws, ...this.drivers)
+	 * 
+	 * @param ws the newly connected ws.WebSocket
+	 * @param request contains info from HTTP 
+	 */
   onconnection(ws: ws.WebSocket, request: http.IncomingMessage) {
-    this.cnxFactory(ws, request)
+		let remote_addr: string = request.socket.remoteAddress
+		let remote_port: number = request.socket.remotePort
+		let remote_family: string = request.socket.remoteFamily
+		let remote = { addr: request.socket.remoteAddress, port: request.socket.remotePort, family: request.socket.remoteFamily }
+		let wsb = new this.WSB()
+		wsb.connectStream(ws, ...this.drivers)
   }
 }
 

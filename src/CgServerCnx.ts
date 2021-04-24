@@ -1,19 +1,19 @@
 import { AckPromise, CgBase, CgMessage, CgType, pbMessage, stime } from "wspbclient";
 
-class ClientGroup extends Array<CgServerCnx> {
+class ClientGroup extends Array<CgServerDriver> {
   aname: string;
   /** the client who initiated the group send, and is waiting for ref/group to ack. */
-  waiting_client_cnx: CgServerCnx;
+  waiting_client_cnx: CgServerDriver;
 }
 
 /** Server-side Client-Group connection handler. */
-export class CgServerCnx extends CgBase<CgMessage> {
+export class CgServerDriver extends CgBase<CgMessage> {
   static groups: Record<string, ClientGroup> = {} // Map(group-name:string => CgMessageHanlder[])
 
   group_name: string;  // group to which this connection is join'd
   nak_count: number;   // for dubious case of client nak'ing a request.
 
-  get group() { return CgServerCnx.groups[this.group_name] }
+  get group() { return CgServerDriver.groups[this.group_name] }
 
   /** referee never[?] initiates a move; can Nak a move; replies to draw/shuffle/next-Turn-Player; 
    * [in 2-player P-v-P (no ref) each player acts as referee to the other?]
@@ -83,12 +83,12 @@ export class CgServerCnx extends CgBase<CgMessage> {
       return
     }
     let join_name = message.group
-    let group: ClientGroup = CgServerCnx.groups[join_name]
+    let group: ClientGroup = CgServerDriver.groups[join_name]
     if (!group) {
       group = new ClientGroup();
       group.aname = join_name;      // for ease of debug reference
       console.log(stime(), "CgServer.eval_join: new Group", group)
-      CgServerCnx.groups[join_name] = group // add new group by name
+      CgServerDriver.groups[join_name] = group // add new group by name
       group[0] = new CgAutoAckCnx() // TODO: spawn a referee, let it connect
     }
     this.group_name = join_name
@@ -103,13 +103,13 @@ export class CgServerCnx extends CgBase<CgMessage> {
   remove_on_ack(promises?: CgMessage[]) {
     this.group.splice(this.group.indexOf(this))
     // close group if nobody left:
-    if (this.group.length === 1 && this.group[0] instanceof CgServerCnx) {
+    if (this.group.length === 1 && this.group[0] instanceof CgServerDriver) {
       let message = new CgMessage({ type: CgType.leave, client_id: 0, cause: "all gone" })
       this.group[0].sendToSocket(message) // CgType.leave
       return
     }
     if (this.group.length === 0) {
-      delete CgServerCnx.groups[this.group_name]
+      delete CgServerDriver.groups[this.group_name]
       this.closeStream(0, "all gone")
     }
   }
@@ -145,7 +145,7 @@ export class CgServerCnx extends CgBase<CgMessage> {
   }
   sendToReferee(msg: CgMessage): Promise<CgMessage> {
     // use auto-ref until there is a better connection.
-    if (!(this.group[0] instanceof CgServerCnx)) {
+    if (!(this.group[0] instanceof CgServerDriver)) {
       this.group[0] = new CgAutoAckCnx()
     }
     return this.group[0].sendToSocket(msg)
@@ -174,7 +174,7 @@ export class CgServerCnx extends CgBase<CgMessage> {
 }
 
 /** in-process Referee "connection" that immediately Acks any message that needs it. */
-class CgAutoAckCnx extends CgServerCnx {
+class CgAutoAckCnx extends CgServerDriver {
   /** 
    * No actual Socket; don't 'send' anything.
    * @return a Promise<Ack> that is resolved.
@@ -182,7 +182,7 @@ class CgAutoAckCnx extends CgServerCnx {
   sendToSocket(message: CgMessage): AckPromise {
     let rv = new AckPromise(message)
     let ack: CgMessage = null;
-    if (CgServerCnx.msgsToAck.includes(message.type)) {
+    if (CgServerDriver.msgsToAck.includes(message.type)) {
       ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
     }
     rv.fulfill(ack)

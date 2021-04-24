@@ -1,13 +1,13 @@
 import { pbMessage, DataBuf, stime, BaseDriver } from "wspbclient";
-import { CnxListener, WSSOpts } from "./wspbserver";
+import { WssListener, WSSOpts } from "./wspbserver";
 
-/** A CnxHandler that handles incoming(buf) by sending it back to this.ws */
+/** A BaseDriver that handles incoming(buf) by sending it back to this.ws */
 const echoserver: WSSOpts = {
 	domain: ".thegraid.com",
 	port: 8443,
 	keydir: "/Users/jpeck/keys/"
 }
-export class EchoCnx<T extends pbMessage> extends BaseDriver<T, T> {
+export class EchoDriver<T extends pbMessage> extends BaseDriver<T, T> {
 	/**
 	 * Override to avoid deserialize, parseEval
 	 * @param buf
@@ -33,7 +33,7 @@ export class EchoCnx<T extends pbMessage> extends BaseDriver<T, T> {
 	}
 }
 
-let cnxlp = new CnxListener("game7", echoserver, EchoCnx).startListening()
+let cnxlp = new WssListener("game7", echoserver, EchoDriver).startListening()
 cnxlp.then((cnxl) => {
 	console.log("listening %s:%d", cnxl.hostname, cnxl.port)
 }, (reason) => {
