@@ -6,7 +6,7 @@ import * as ws from "ws";
 import * as moment from 'moment';
 import type * as jspb from 'google-protobuf';
 import { EzPromise } from "@thegraid/EzPromise";
-import type { ServerSocketDriver } from "./CnxHandler";
+import { ServerSocketDriver } from "./CnxHandler";
 import type { AnyWSD } from "wspbclient";
 
 
@@ -83,15 +83,12 @@ export class CnxListener {
 	wss: ws.Server
 
 	/**
-	 * Listen for connections; make stream from WSB up through Drivers
+	 * Listen for connections; make stream from ServerSocketDriver up through Drivers
 	 * @param basename identifies the hostname and the key/cert alias
 	 * @param wssOpts {domain, port, keypath}
-	 * @param WSB a ServerSocketDriver
 	 * @param Drivers any stackable WebSocketDriver
 	 */
-	constructor(basename: string, wssOpts: WSSOpts,
-		WSB: { new(): ServerSocketDriver<pbMessage> },
-		...Drivers: (new () => AnyWSD)[]) {
+	constructor(basename: string, wssOpts: WSSOpts, ...Drivers: (new () => AnyWSD)[]) {
 		let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
@@ -105,7 +102,7 @@ export class CnxListener {
 			let remote_port: number = request.socket.remotePort
 			let remote_family: string = request.socket.remoteFamily
 			let remote = { addr: request.socket.remoteAddress, port: request.socket.remotePort, family: request.socket.remoteFamily }
-			let wsb = new WSB() as ServerSocketDriver<pbMessage>
+			let wsb = new ServerSocketDriver<pbMessage>()
 			wsb.connectStream(ws, ...Drivers)
 		}
   }
