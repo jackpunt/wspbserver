@@ -4,7 +4,7 @@ import type * as http from "http";
 import * as dns from "dns";
 import * as ws from "ws";
 import { EzPromise } from "@thegraid/EzPromise";
-import { ServerSocketDriver } from "./CnxHandler";
+import { ServerSocketDriver } from "./ServerSocketDriver";
 import type { AnyWSD, stime, pbMessage } from "wspbclient";
 
 

@@ -1,13 +1,13 @@
 import { WSSOpts, WssListener } from './wspbserver';
-import { CgServerDriver } from './CgServerCnx'
+import { CgServerDriver } from './CgServerDriver'
 
-const cgserve: WSSOpts = {
+const cgserver: WSSOpts = {
 	domain: ".thegraid.com",
 	port: 8444,
 	keydir: "/Users/jpeck/keys/"
 }
 
-let cnxlp = new WssListener("game7", cgserve, CgServerDriver ).startListening()
+let cnxlp = new WssListener("game7", cgserver, CgServerDriver ).startListening()
 cnxlp.then((cnxl) => {
 	console.log("listening %s:%d", cnxl.hostname, cnxl.port)
 }, (reason) => {

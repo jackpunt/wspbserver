@@ -7,7 +7,7 @@ const echoserver: WSSOpts = {
 	port: 8443,
 	keydir: "/Users/jpeck/keys/"
 }
-export class EchoDriver<T extends pbMessage> extends BaseDriver<T, T> {
+export class EchoServer<T extends pbMessage> extends BaseDriver<T, T> {
 	/**
 	 * Override to avoid deserialize, parseEval
 	 * @param buf
@@ -33,7 +33,7 @@ export class EchoDriver<T extends pbMessage> extends BaseDriver<T, T> {
 	}
 }
 
-let cnxlp = new WssListener("game7", echoserver, EchoDriver).startListening()
+let cnxlp = new WssListener("game7", echoserver, EchoServer).startListening()
 cnxlp.then((cnxl) => {
 	console.log("listening %s:%d", cnxl.hostname, cnxl.port)
 }, (reason) => {
