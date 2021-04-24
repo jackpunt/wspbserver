@@ -5,7 +5,7 @@ import { ServerSocketDriver } from './CnxHandler';
 
 const cgserve: WSSOpts = {
 	domain: ".thegraid.com",
-	port: 8445,
+	port: 8444,
 	keydir: "/Users/jpeck/keys/"
 }
 function newClient(ws: ws.WebSocket) {

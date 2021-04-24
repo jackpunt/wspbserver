@@ -8,7 +8,7 @@ class ClientGroup extends Array<CgServerCnx> {
 
 /** Server-side Client-Group connection handler. */
 export class CgServerCnx extends CgBase<CgMessage> {
-  static groups: Record<string, ClientGroup> // Map(group-name:string => CgMessageHanlder[])
+  static groups: Record<string, ClientGroup> = {} // Map(group-name:string => CgMessageHanlder[])
 
   group_name: string;  // group to which this connection is join'd
   nak_count: number;   // for dubious case of client nak'ing a request.
@@ -31,11 +31,11 @@ export class CgServerCnx extends CgBase<CgMessage> {
   parseEval(message: CgMessage): void {
     if (message.type != CgType.join && this.group[message.client_id] != this) {
       this.sendNak("not a member", { group: this.group_name })
-      console.log("ignore message from non-member")
+      console.log(stime(), "ignore message from non-member", message.client_id)
       return
     }
     if (this.has_message_to_ack && message.type != CgType.ack) {
-      console.log("sendNak: outstanding ack, cannot do", message.type)
+      console.log(stime(), "sendNak: outstanding ack, cannot do", message.type)
       this.sendNak("need to ack: " + this.message_to_ack_type)
       return
     }
@@ -86,20 +86,21 @@ export class CgServerCnx extends CgBase<CgMessage> {
     let group: ClientGroup = CgServerCnx.groups[join_name]
     if (!group) {
       group = new ClientGroup();
-      group.aname = message.cause; // for ease of debug reference
-      console.log("CgServer.eval_join: new Group", group)
-      CgServerCnx.groups[join_name] = group
+      group.aname = join_name;      // for ease of debug reference
+      console.log(stime(), "CgServer.eval_join: new Group", group)
+      CgServerCnx.groups[join_name] = group // add new group by name
       group[0] = new CgAutoAckCnx() // TODO: spawn a referee, let it connect
     }
     this.group_name = join_name
     let client_id = this.isFromReferee(message) ? 0 : group.length
-    group[client_id] = this
-    // let ack = new CgMessage({ type: CgType.ack, success: true, client_id: client_id, group: join_name })
-    // this.sendToSocket(ack)
+    this.client_id = client_id;
+    group[client_id] = this      // shift for referee, push for regular client
     this.sendAck("joined", {client_id, group: join_name})
     return
   }
-  remove_on_ack() {
+
+  /** when client leaves group: what happens at group[client_id] ??  mark it 'left'? */
+  remove_on_ack(promises?: CgMessage[]) {
     this.group.splice(this.group.indexOf(this))
     // close group if nobody left:
     if (this.group.length === 1 && this.group[0] instanceof CgServerCnx) {
@@ -114,7 +115,9 @@ export class CgServerCnx extends CgBase<CgMessage> {
   }
   /** client leaving; inform others? */
   eval_leave(message: CgMessage): void {
-    let remove_on_ack = () => { this.group.splice(this.group.indexOf(this)) }
+    // in CgClient, cases for: isReferee[ack it], isSelf[go away], other[inform, change avatar?]
+    // here it came from client seeking to leave, tell referee, tell others; sendAck
+    let remove_on_ack = (promises?: CgMessage[]) => { this.remove_on_ack(promises) }
     this.sendToGroup(message, null, null, remove_on_ack)
     // when this.group.find(g => g.waiting_for_ack) == false --> sendAck()
     return

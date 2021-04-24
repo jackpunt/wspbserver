@@ -8,13 +8,14 @@
   ],
   "scripts": {
     "echo": "node dist/out-tsc/echoserver.js",
-    "cgserve": "node dist/out-tsc/cg-server.js",
+    "cgserver": "node dist/out-tsc/cg-server.js",
     "testns": "jest --runInBand --force-exit --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
     "testwss": "jest --runInBand --force-exit --detectOpenHandles --verbose -t 'wss:'",
     "test": "jest --runInBand --force-exit --detectOpenHandles --verbose",
     "tsc-options": "are configured in tsconfig.json",
     "tsc": "tsc",
     "clean": "rm -f dist/out-tsc/*",
+    "reserve": "npm run build; npm run cgserver",
     "build": "npm run clean; npm run tsc"
   },
   "repository": {

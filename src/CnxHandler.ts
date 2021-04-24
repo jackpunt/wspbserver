@@ -27,8 +27,8 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 	connectWebSocket(wss: ws$WebSocket | WebSocket | string) {
 		if (wss instanceof ws$WebSocket) {
 			this.wss = wss
-			wss.onmessage = function (ev: ws$WebSocket.MessageEvent) {
-				this.onmessage(ev.data)
+			wss.onmessage = (ev: ws$WebSocket.MessageEvent) => {
+				this.upstream.wsmessage(ev.data as Buffer)
 			}
 		} else { super.connectWebSocket(wss) }
 	}
