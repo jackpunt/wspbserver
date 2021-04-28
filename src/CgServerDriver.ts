@@ -1,12 +1,20 @@
-import { AckPromise, CgBase, CgMessage, CgType, pbMessage, stime } from "wspbclient";
+import { AckPromise, CgBase, CgMessage, CgMessageOpts, CgType, pbMessage, stime, UpstreamDrivable } from "wspbclient";
+import { ServerSocketDriver } from "./ServerSocketDriver";
+import type * as ws$WebSocket from "ws";
 
+//type ClientGroup2 = Record<string, ServerSocketDriver<pbMessage>> ;
 class ClientGroup extends Array<CgServerDriver> {
+  /** the join_name of this ClientGroup */
   aname: string;
   /** the client who initiated the group send, and is waiting for ref/group to ack. */
   waiting_client_cnx: CgServerDriver;
 }
 
-/** Server-side Client-Group connection handler. */
+/** CgServerDriver: Server-side Client-Group protocol handler 
+ * for one client of this.group (as found in global/static Record of ClientGroup)
+ * 
+ * ASSERT: is running on Node, and this.dnstream ISA ServerSocketDriver with ws$WebSocket
+ */
 export class CgServerDriver extends CgBase<CgMessage> {
   static groups: Record<string, ClientGroup> = {} // Map(group-name:string => CgMessageHanlder[])
 
@@ -15,12 +23,37 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   get group() { return CgServerDriver.groups[this.group_name] }
 
+  connectDnStream(dnstream: UpstreamDrivable<CgMessage>): this {
+    super.connectDnStream(dnstream)
+    if (dnstream instanceof ServerSocketDriver) {
+      // get signaling from server-side/Node.js socket:
+			//dnstream.wsopen = (ev: ws$WebSocket.OpenEvent) => {}    // super() -> log
+			//dnstream.wserror = (ev: ws$WebSocket.ErrorEvent) => {}  // super() -> log
+      //dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
+      dnstream.wsclose = (ev: ws$WebSocket.CloseEvent) => {
+        let ndx = this.group.findIndex(g => g === this);
+        let { target, wasClean, reason, code } = ev
+        console.log(stime(), "CgServerDriver.dnstream.wsclose", { code, reason, wasClean })
+        if (ndx >= 0) {
+          this.group.splice(ndx, 1);  // remove this client-cnx from group
+          this.send_leave(this.group.aname, ndx, "closed")
+        }
+      }
+    }
+    return this
+  }
+
   /** referee never[?] initiates a move; can Nak a move; replies to draw/shuffle/next-Turn-Player; 
    * [in 2-player P-v-P (no ref) each player acts as referee to the other?]
    * may need a way to tell client they are the referee/moderator
    */
   isFromReferee(message: CgMessage): boolean {
     return (message.client_id === 0 && message.cause === "referee")
+  }
+
+  sendAck(cause: string, opts?: CgMessageOpts): AckPromise {
+    console.log(stime(), "CgServerDriver: sendAck", cause, opts)
+    return super.sendAck(cause, opts)
   }
   /**
    * process an incoming message from client.
@@ -76,9 +109,15 @@ export class CgServerDriver extends CgBase<CgMessage> {
     super.eval_nak(message, req); // resolve and clear promise_for_ack
     return
   }
-  /** on server: add to group */
+  /** on server: add to group: anybody can join, no filters at this point.  
+   * 
+   * If client_id is set to 0, and cause set to 'referee', then give special assignment to client_id 0.
+   * (see this.isFromReferee()); otherwise client_id = group.length and push onto end of group.
+   */
   eval_join(message: CgMessage): void {
     if (this.group_name !== undefined) {
+      // Maybe someday support an array of group names... ? to multiplex the client-server cnx
+      // but then each message will need an associated group_name/group_id (default to last used?)
       this.sendNak("already in group", {group: this.group_name })
       return
     }
@@ -87,12 +126,12 @@ export class CgServerDriver extends CgBase<CgMessage> {
     if (!group) {
       group = new ClientGroup();
       group.aname = join_name;      // for ease of debug reference
-      console.log(stime(), "CgServer.eval_join: new Group", group)
+      console.log(stime(), "CgServerDriver.eval_join: new Group", group)
       CgServerDriver.groups[join_name] = group // add new group by name
       group[0] = new CgAutoAckCnx() // TODO: spawn a referee, let it connect
     }
     this.group_name = join_name
-    let client_id = this.isFromReferee(message) ? 0 : group.length
+    let client_id = this.isFromReferee(message) ? 0 : group.length // note: group[0] is *always* set
     this.client_id = client_id;
     group[client_id] = this      // shift for referee, push for regular client
     this.sendAck("joined", {client_id, group: join_name})
@@ -129,15 +168,17 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   eval_send(message: CgMessage): void {
     // send "done" to origin when everyone has replied. unless ref Nak's it...
-    let send_ack_done = () => { this.sendAck("done") }
+    let send_ack_done = () => { this.sendAck("send_done") }
     this.sendToGroup(message, null, null, send_ack_done);
     return
   }
+  /** forward ack'd message to all of group. including the sender. */
   sendToMembers(message: CgMessage): Array<Promise<CgMessage>> {
-    // forward original message to rest of group
+    // forward original message to all/other members of group
+    let cc_sender = !message.nocc
     let promises = Array<Promise<CgMessage>>();
     this.group.forEach((member, ndx) => {
-      if (member != this && ndx > 0) {
+      if (ndx > 0 && (cc_sender || member != this)) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
         promises.push(member.sendToSocket(message))
       }
     })
@@ -160,7 +201,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     this.group.waiting_client_cnx = this
     this.sendToReferee(message).then((ack) => {
       if (ack.success) {
-        // forward original message to rest of group
+        // forward original message to all/rest of group
         let promises = this.sendToMembers(message)
         let alldone = Promise.all(promises)
         alldone.then(on_ack, on_rej).finally(on_fin) // ignore any throw()
@@ -186,6 +227,7 @@ class CgAutoAckCnx extends CgServerDriver {
       ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
     }
     rv.fulfill(ack)
+    console.log(stime(), "CgAutoAck: ack=", ack)
     return rv
   }
 }

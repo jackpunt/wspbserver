@@ -11,6 +11,7 @@
       "program": "dist/cg-server.js",
       "args": [""],
       "console": "integratedTerminal",
+      "runtimeArgs": ["--preserve-symlinks"], // when symlinked to wspbclient
       "internalConsoleOptions": "neverOpen"
     },
     {

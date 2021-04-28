@@ -5,7 +5,7 @@ import * as dns from "dns";
 import * as ws from "ws";
 import { EzPromise } from "@thegraid/EzPromise";
 import { ServerSocketDriver } from "./ServerSocketDriver";
-import type { AnyWSD, pbMessage } from "wspbclient";
+import type { AnyWSD, pbMessage, WebSocketBase } from "wspbclient";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
@@ -28,6 +28,8 @@ export interface  WSSOpts { domain: string, port: number, keydir: string, }
 
 /** a subset of https.ServerOptions */
 export type Credentials = https.ServerOptions // {key: string, cert: string}
+
+export type Remote = {addr: string, port: number, family: string}
 
 /** Reminder of options that 'ws' makes available, 
  * WssListener default sets binaryType: 'arraybuffer' 
@@ -60,12 +62,14 @@ export class WssListener {
 	keypath: string;
 	certpath: string;
 	credentials: Credentials
-	WSB: (new () => ServerSocketDriver<pbMessage>) = ServerSocketDriver;
+	/** ServerSocketDriver class contructor. */
+	SSD: (new (remote?: Remote) => ServerSocketDriver<pbMessage>) = ServerSocketDriver;
 	drivers: (new()=>AnyWSD)[]
 	wss: ws.Server
 
 	/**
-	 * Listen for connections; make stream from ServerSocketDriver up through Drivers
+	 * Listen for connections;  
+	 * Make stream from ServerSocketDriver up through given Drivers
 	 * @param basename identifies the hostname and the key/cert alias
 	 * @param wssOpts {domain, port, keypath}
 	 * @param Drivers any stackable WebSocketDriver
@@ -135,11 +139,11 @@ export class WssListener {
 	 * @param request contains info from HTTP 
 	 */
   onconnection(ws: ws.WebSocket, request: http.IncomingMessage) {
-		let remote_addr: string = request.socket.remoteAddress
-		let remote_port: number = request.socket.remotePort
-		let remote_family: string = request.socket.remoteFamily
-		let remote = { addr: request.socket.remoteAddress, port: request.socket.remotePort, family: request.socket.remoteFamily }
-		let wsb = new this.WSB()
-		wsb.connectStream(ws, ...this.drivers)
+		let addr: string = request.socket.remoteAddress
+		let port: number = request.socket.remotePort
+		let family: string = request.socket.remoteFamily
+		let remote: Remote = { addr, port, family }
+		let ssd = new this.SSD(remote) // new () => ServerSocketDriver: WebSocketBase
+		ssd.connectStream(ws, ...this.drivers)
   }
 }
