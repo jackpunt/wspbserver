@@ -142,9 +142,10 @@ export class CgServerDriver extends CgBase<CgMessage> {
       CgServerDriver.groups[join_name] = group // add new group by name
       new CgAutoAckDriver(this.ref_join_message(join_name)) // TODO: spawn a referee, let it connect
     }
-    let client_id = this.isFromReferee(message) ? 0 : group.length // note: group[0] is *always* set
+    let nid = () => [1,2,3,4,5].find(n => group.find(c => c.client_id === n) === undefined)
+    let client_id = this.isFromReferee(message) ? 0 : nid(); // note: group[0] is *always* set
     this.client_id = client_id;
-    group[client_id] = this      // shift for referee, push for regular client
+    if (client_id == 0) { group[0] = this } else { group.push(this)}
     console.log(stime(this, ".eval_join len="), this.group.map((c,ndx ) => [ndx, c.client_id, c.remote]), this.remote)
     this.sendAck("joined", {client_id, group: join_name})
     return
