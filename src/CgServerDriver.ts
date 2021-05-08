@@ -64,13 +64,17 @@ export class CgServerDriver extends CgBase<CgMessage> {
     return this
   }
 
+  isReferee(): boolean {
+    return this.client_id === 0
+  }
   /** referee never[?] initiates a move; can Nak a move; replies to draw/shuffle/next-Turn-Player; 
    * [in 2-player P-v-P (no ref) each player acts as referee to the other?]
    * may need a way to tell client they are the referee/moderator
    */
-  isFromReferee(message: CgMessage): boolean {
+  isRefereeJoin(message: CgMessage): boolean {
     return (message.client_id === 0 && message.cause === "referee")
   }
+  /** recruit CgAutoAck as referee */
   ref_join_message(group: string, client_id: number = 0, cause:string = "referee") {
     return new CgMessage({type: CgType.join, client_id, group, cause })
   }
@@ -114,8 +118,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * @override
    */
   eval_nak(message: CgMessage, req: CgMessage): void {
-    if (this.isFromReferee(message)) {
-      let client = this.group.waiting_client_cnx
+    if (this.isReferee()) {
+      let client = this.group.waiting_client_cnx // or: message.client_id ??
+      message.client_from = 0      // indicate is from Referee
       client.sendToSocket(message) // forward message to originator. (no client_waiting)
     } else {
       // Some non-ref client sent a NAK... we can't really help them.
@@ -157,7 +162,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
       CgServerDriver.groups[join_name] = group // add new group by name
       new CgAutoAckDriver(this.ref_join_message(join_name)) // TODO: spawn a referee, let it connect
     }
-    if (this.isFromReferee(message)) { 
+    if (this.isRefereeJoin(message)) { 
       if ((group[0] instanceof CgServerDriver) && !(group[0] instanceof CgAutoAckDriver)) {
        this.sendNak('referee exists', {group: join_name})
        return
@@ -204,6 +209,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     // in CgClient, cases for: isReferee[ack it], isSelf[go away], other[inform, change avatar?]
     // here it came from client seeking to leave, tell referee, tell others; sendAck
     message.nocc = true
+    message.client_from = this.client_id
     let remove_from_group = (promises?: CgMessage[]) => { 
       this.sendAck(message.cause, {group: this.group_name, client_id: this.client_id})
       this.remove_from_group(promises) 
@@ -232,12 +238,15 @@ export class CgServerDriver extends CgBase<CgMessage> {
       this.sendNak("send failed")
     }
 
-    console.log(stime(this, ".eval_send: client_id ="), message.client_id)
-    if (message.client_id !== undefined) {
-      let promise = this.group[message.client_id].sendToSocket(message)
+    message.client_from = this.client_id // set "from"
+    let client_to = message.client_id    // could be null send to 'all'
+    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to}`)
+    if (client_to !== undefined) {
+      console.log(stime(this, ".eval_send:"), "message->", client_to, message)
+      let promise = this.group[client_to].sendToSocket(message)
       promise.then(send_ack_done, send_failed)
     } else {
-      this.sendToGroup(message, send_all_done, send_failed, ()=>{console.log("... sTG finally")});
+      this.sendToGroup(message, send_all_done, send_failed, () => { console.log("... sendToGroup finally") });
     }
     return
   }
@@ -248,21 +257,28 @@ export class CgServerDriver extends CgBase<CgMessage> {
     // if ack-success, then send to rest of group
     // if ack-fail, then sendNak(ack.cause)
     // if fail-to-send or fail-to-ack, then sendNak("app failure")
-    this.group.waiting_client_cnx = this
-    this.sendToReferee(message).then((ack) => {
-      if (ack.success) {
+    let sendToOthers = (message: CgMessage) => {
         // forward original message to all/rest of group
         let promises = this.sendToMembers(message)
         let alldone = Promise.all(promises)
         alldone.then(on_ack, on_rej)
         alldone.finally(on_fin) // ignore any throw()
         // this.handlePromiseAll(alldone, on_ack, on_rej, null, on_fin)
-      } else {
-        this.sendNak(ack.cause)  // "illegal move"
-      }
-    }, (reason) => {
-      this.sendNak(reason) // "network or application failed"
-    })
+    }
+    this.group.waiting_client_cnx = this
+    if (this.isReferee()) {
+      sendToOthers(message) // referee sending a broadcast
+    } else {
+      this.sendToReferee(message).then((ack) => {
+        if (ack.success) {
+          sendToOthers(message)
+        } else {
+          this.sendNak(ack.cause)  // "illegal move"
+        }
+      }, (reason) => {
+        this.sendNak(reason) // "network or application failed"
+      })
+    }
   }
 
   sendToReferee(msg: CgMessage) {
@@ -271,6 +287,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
       console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.group_name)
       new CgAutoAckDriver(this.ref_join_message(this.group_name)) // failsafe. should not happen
     }
+    console.log(stime(this, ".sendToReferee ->"), 0, msg)
     return this.group[0].sendToSocket(msg)
   }
 
@@ -281,6 +298,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     let promises = Array<AckPromise>();
     this.group.forEach((member, ndx) => {
       if (ndx > 0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
+        console.log(stime(this, ".sendToMembers ->"), member.client_id)
         promises.push(member.sendToSocket(message))
       }
     })
@@ -290,7 +308,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   /** @override for logging */
   sendToSocket(message: CgMessage): AckPromise {
-    let ml = (message.msg !== undefined) ? "["+message.msg.length+"]" : (message.cause || message.success)
+    let ml = (message.msg !== undefined) ? `[${message.msg[1]}+${message.msg.length}]` : (message.cause || message.success)
     console.log(stime(this, ".sendToSocket"), message.cgType, "->" , {client_id: this.client_id, ml: ml, remote: this.remote})
     return super.sendToSocket(message)
   }
