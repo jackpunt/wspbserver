@@ -7,8 +7,6 @@ import type { Remote } from "./wspbserver";
 class ClientGroup extends Array<CgServerDriver> {
   /** the join_name of this ClientGroup */
   aname: string;
-  /** the client who initiated the group send, and is waiting for ref/group to ack. */
-  waiting_client_cnx: CgServerDriver;
 }
 
 /** CgServerDriver: Server-side Client-Group protocol handler 
@@ -101,6 +99,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
       this.sendNak("need to ack: " + this.message_to_ack_type)
       return
     }
+    message.client_from = this.client_id
     return super.parseEval(message)
   }
   /**
@@ -108,7 +107,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   eval_ack(message: CgMessage, req: CgMessage): void {
     this.nak_count = 0;
-    // handle ack of send by resolving promise (hmm, never promise_reject(cause) ?)
+    // handle ack of send: promise_of_ack.fullfil(ack) [hmm, never promise.reject(cause) ?]
     return super.eval_ack(message, req)
   }
   /**
@@ -119,8 +118,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   eval_nak(message: CgMessage, req: CgMessage): void {
     if (this.isReferee()) {
-      let client = this.group.waiting_client_cnx // or: message.client_id ??
-      message.client_from = 0      // indicate is from Referee
+      let client = this.group[message.client_id]
       client.sendToSocket(message) // forward message to originator. (no client_waiting)
     } else {
       // Some non-ref client sent a NAK... we can't really help them.
@@ -209,7 +207,6 @@ export class CgServerDriver extends CgBase<CgMessage> {
     // in CgClient, cases for: isReferee[ack it], isSelf[go away], other[inform, change avatar?]
     // here it came from client seeking to leave, tell referee, tell others; sendAck
     message.nocc = true
-    message.client_from = this.client_id
     let remove_from_group = (promises?: CgMessage[]) => { 
       this.sendAck(message.cause, {group: this.group_name, client_id: this.client_id})
       this.remove_from_group(promises) 
@@ -238,7 +235,6 @@ export class CgServerDriver extends CgBase<CgMessage> {
       this.sendNak("send failed")
     }
 
-    message.client_from = this.client_id // set "from"
     let client_to = message.client_id    // could be null send to 'all'
     console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to}`)
     if (client_to !== undefined) {
@@ -265,7 +261,6 @@ export class CgServerDriver extends CgBase<CgMessage> {
         alldone.finally(on_fin) // ignore any throw()
         // this.handlePromiseAll(alldone, on_ack, on_rej, null, on_fin)
     }
-    this.group.waiting_client_cnx = this
     if (this.isReferee()) {
       sendToOthers(message) // referee sending a broadcast
     } else {
@@ -283,12 +278,13 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   sendToReferee(msg: CgMessage) {
     // use auto-ref until there is a better connection.
-    if (!(this.group[0] instanceof CgServerDriver)) {
+    let ref = this.group[0]
+    if (!(ref instanceof CgServerDriver)) {
       console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.group_name)
       new CgAutoAckDriver(this.ref_join_message(this.group_name)) // failsafe. should not happen
     }
     console.log(stime(this, ".sendToReferee ->"), 0, msg)
-    return this.group[0].sendToSocket(msg)
+    return ref.sendToSocket(msg)
   }
 
   /** forward ack'd message to all of group. including the sender. */
@@ -342,9 +338,10 @@ class CgAutoAckDriver extends CgServerDriver {
   sendToSocket(message: CgMessage): AckPromise {
     let rv = new AckPromise(message)
     let ack: CgMessage = null;
+    let client_id = message.client_from
     // msgsToAck: [none, join, leave, send]
     if (CgServerDriver.msgsToAck.includes(message.type)) {
-      ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve" })
+      ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve", client_id })
       console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote})
     }
     rv.fulfill(ack)
