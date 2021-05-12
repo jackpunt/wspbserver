@@ -53,8 +53,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
         console.log(stime(), "CgServerDriver.dnstream.wsclose", { code, reason, wasClean })
         let ndx = this.group && this.group.findIndex(client => client === this);
         if (ndx >= 0) {
-          let type = CgType.leave, client_id = this.client_id, cause = "closed", nocc = true
-          this.sendToMembers(new CgMessage({ type, client_id, cause, nocc })) // tell others this client has gone (ignore acks)
+          let type = CgType.leave, client_id = this.client_id, cause = "closed", nocc = true, group = this.group.aname
+          let message = new CgMessage({ type, client_id, cause, group, nocc })
+          this.sendToMembers(message, true) // tell others this client has gone (ignore acks)
           this.remove_from_group()  // remove this client-cnx from group
         }
       }
@@ -78,9 +79,15 @@ export class CgServerDriver extends CgBase<CgMessage> {
   }
   
   sendAck(cause: string, opts?: CgMessageOpts): AckPromise {
-    console.log(stime(), "CgServerDriver: sendAck", cause, opts)
+    let mopts = opts
+    if (opts instanceof CgMessage) {
+      let { client_id, success, client_from } = opts; mopts = { client_id, success, client_from }
+    }
+    console.log(stime(this, ".sendAck:"), `${this.client_id} -> ('${cause}',`, mopts, ')')
     return super.sendAck(cause, opts)
   }
+  /** identify port before joined. */
+  get client_port() { return this.client_id !== undefined ? this.client_id : `${this.remote.addr}:${this.remote.port}`}
   /**
    * process an incoming message from client.
    * @param message
@@ -88,9 +95,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * @override
    */
   parseEval(message: CgMessage): void {
-    console.log(stime(this, ".parseEval <-"), this.client_id, {Received: message.cgType})
+    console.log(stime(this, ".parseEval"), `${this.client_port} <-`, { Received: message.cgType, success: message.success, cause: message.cause })
     if (message.type != CgType.join && this.client_id === undefined) {
-      console.log(stime(this, ".parseEval:"), "nak & ignore message from non-member", message.client_id)
+      console.log(stime(this, ".parseEval:"), "nak & ignore message from non-member", this.client_port)
       this.sendNak("not a member", { group: this.group_name })
       return
     }
@@ -100,7 +107,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
       return
     }
     message.client_from = this.client_id
-    return super.parseEval(message)
+    return super.parseEval(message) // detect "ignore spurious Ack:"
   }
   /**
    * @override
@@ -238,7 +245,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     let client_to = message.client_id    // could be null send to 'all'
     console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to}`)
     if (client_to !== undefined) {
-      console.log(stime(this, ".eval_send:"), "message->", client_to, message)
+      console.log(stime(this, ".eval_send:"), `message->${client_to} ${message.cgType}=${message.type}`, this.innerMessageString(message))
       let promise = this.group[client_to].sendToSocket(message)
       promise.then(send_ack_done, send_failed)
     } else {
@@ -283,17 +290,17 @@ export class CgServerDriver extends CgBase<CgMessage> {
       console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.group_name)
       new CgAutoAckDriver(this.ref_join_message(this.group_name)) // failsafe. should not happen
     }
-    console.log(stime(this, ".sendToReferee ->"), 0, msg)
+    console.log(stime(this, ".sendToReferee ->"), 0, this.innerMessageString(msg))
     return ref.sendToSocket(msg)
   }
 
-  /** forward ack'd message to all of group. including the sender. */
-  sendToMembers(message: CgMessage): Array<AckPromise> {
+  /** forward ack'd message to all of group. including the sender (unless nocc: true). */
+  sendToMembers(message: CgMessage, andRef: boolean = false): Array<AckPromise> {
     // forward original message to all/other members of group
-    let cc_sender = !message.nocc
+    let cc_sender = !message.nocc, n0 = andRef ? -1 : 0
     let promises = Array<AckPromise>();
     this.group.forEach((member, ndx) => {
-      if (ndx > 0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
+      if (ndx > n0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
         console.log(stime(this, ".sendToMembers ->"), member.client_id)
         promises.push(member.sendToSocket(message))
       }
@@ -301,12 +308,16 @@ export class CgServerDriver extends CgBase<CgMessage> {
     //promises[0].fulfill(undefined) // ensure there is  1 Promise filled, is if !message.ackExpected
     return promises
   }
-
+  innerMessageString(message: CgMessage) {
+    return (message.msg !== undefined) ? `[${message.msg[1]}+${message.msg.length}]` : `(${message.cause || message.success})`
+  }
   /** @override for logging */
   sendToSocket(message: CgMessage): AckPromise {
-    let ml = (message.msg !== undefined) ? `[${message.msg[1]}+${message.msg.length}]` : (message.cause || message.success)
-    console.log(stime(this, ".sendToSocket"), message.cgType, "->" , {client_id: this.client_id, ml: ml, remote: this.remote})
-    return super.sendToSocket(message)
+    let msg = (message.msg !== undefined) ? `[${message.msg[1]}+${message.msg.length}]` : (message.cause || message.success)
+    console.log(stime(this, `.sendToSocket[${this.client_port}] ->`), message.cgType, {client_id: message.client_id, msg: msg, port: this.remote.port})
+    let ackPromise = super.sendToSocket(message) // sets this.promise_to_ack 
+
+    return ackPromise
   }
 
   handlePromiseAll(promise: Promise<CgMessage[]>,
@@ -342,7 +353,7 @@ class CgAutoAckDriver extends CgServerDriver {
     // msgsToAck: [none, join, leave, send]
     if (CgServerDriver.msgsToAck.includes(message.type)) {
       ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve", client_id })
-      console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote})
+      console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote.port})
     }
     rv.fulfill(ack)
     return rv
