@@ -101,9 +101,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
       this.sendNak("not a member", { group: this.group_name })
       return
     }
-    if (this.has_message_to_ack && message.type != CgType.ack) {
+    if (!this.ack_resolved && message.type != CgType.ack) {
       console.log(stime(), "sendNak: outstanding ack, cannot do", message.type)
-      this.sendNak("need to ack: " + this.message_to_ack_type)
+      this.sendNak("need to ack: " + this.ack_message_type)
       return
     }
     message.client_from = this.client_id
@@ -185,11 +185,16 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   /** when client leaves group: what happens at group[client_id] ??  mark it 'left'? */
   remove_from_group(promises?: CgMessage[]) {
-    console.log(stime(this, ".remove_from_group: cid="), this.client_id,"group=", this.group_ary)
+    console.log(stime(this, ".remove_from_group: cid="), this.client_id, "group=", this.group_ary)
     let this_group = this.group.filter(csd => csd.client_id !== this.client_id) as ClientGroup;
     CgServerDriver.groups[this.group_name] = this_group
-    console.log(stime(this, ".remove_from_group: cid="), this.client_id,"group=", this.group_ary)
+    console.log(stime(this, ".remove_from_group: cid="), this.client_id, "group=", this.group_ary)
     //this.client_id = undefined
+
+    if (this.group.length > 0 && this.client_id === 0) {
+      // ref has disconnected! Replace with auto-ack:
+      new CgAutoAckDriver(this.ref_join_message(this.group.aname))
+    }
 
     if (this.group.length === 1 && this.group[0] instanceof CgServerDriver) {
       // tell the referee to leave:
@@ -199,7 +204,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
       if (ref instanceof CgAutoAckDriver) {
         // leave it; ref.group == ?
       } else {
-        this.group[0].sendToSocket(message) // eval_leave & send Ack
+        this.waitForAckThen(()=>{
+          this.group[0].sendToSocket(message) // eval_leave & send Ack
+        })
       }
       return
     }
