@@ -50,7 +50,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
       //dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
       dnstream.wsclose = (ev: ws$WebSocket.CloseEvent) => {
         let { target, wasClean, reason, code } = ev
-        console.log(stime(), "CgServerDriver.dnstream.wsclose", { code, reason, wasClean })
+        console.log(stime(), `CgServerDriver.dnstream.wsclose[${this.client_id}]`, { code, reason, wasClean })
         let ndx = this.group && this.group.findIndex(client => client === this);
         if (ndx >= 0) {
           let type = CgType.leave, client_id = this.client_id, cause = "closed", nocc = true, group = this.group.aname
@@ -201,15 +201,10 @@ export class CgServerDriver extends CgBase<CgMessage> {
       let ref = this.group[0]
       console.log(stime(this, ".remove_from_group: group[0] ref ="), ref.remote)
       let message = new CgMessage({ type: CgType.leave, client_id: 0, cause: "all others gone" })
-      //let p_ack = this.ack_promise, p_res = p_ack.resolved, p_msg = this.innerMessageString(p_ack.message), p_val = this.innerMessageString(p_ack.value as CgMessage)
-      //console.log(stime(this, ".remove_from_group"), this.client_id, { p_res, p_msg, p_val })
-      this.group[0].waitForAckThen((ack: CgMessage) => {
-        //console.log(stime(this, ".remove_from_group"), this.client_id, '->' ,this.innerMessageString(message))
-        let pack = this.group[0].sendToSocket(message); // eval_leave & send Ack
-        pack.finally(() => {
-          console.log(stime(this, ".remove_from_group: cid="), this.client_id, this.group.members)
-        })
-    })
+      let pack = ref.sendToSocket(message); // eval_leave & send Ack
+      pack.finally(() => {
+        console.log(stime(this, ".remove_from_group: cid="), this.client_id, this.group.members)
+      })
       return
     }
     if (this.group.length === 0) {
@@ -218,8 +213,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
       return
     }
   }
-  /** this client leaving; inform others? */
+  /** this client leaving; inform others? see also: dnstream.wsclose(reason, code, wasClean) */
   eval_leave(message: CgMessage): void {
+    console.log(stime(this, `.eval_leave[${this.client_id}] <-`), this.innerMessageString(message))
     // in CgClient, cases for: isReferee[ack it], isSelf[go away], other[inform, change avatar?]
     // here it came from client seeking to leave, tell referee, tell others; sendAck
     message.nocc = true
@@ -252,9 +248,8 @@ export class CgServerDriver extends CgBase<CgMessage> {
     }
 
     let client_to = message.client_id    // could be null send to 'all'
-    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to}`)
+    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to || 'group'}`, this.innerMessageString(message))
     if (client_to !== undefined) {
-      console.log(stime(this, ".eval_send:"), `message->${client_to} ${message.cgType}=${message.type}`, this.innerMessageString(message))
       let promise = this.group[client_to].sendToSocket(message)
       promise.then(send_ack_done, send_failed)
     } else {
@@ -310,7 +305,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     let promises = Array<AckPromise>();
     this.group.forEach((member, ndx) => {
       if (ndx > n0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
-        console.log(stime(this, ".sendToMembers ->"), member.client_id)
+        console.log(stime(this, `.sendToMembers[${this.client_id}] ->`), member.client_id)
         promises.push(member.sendToSocket(message))
       }
     })
@@ -358,7 +353,7 @@ class CgAutoAckDriver extends CgServerDriver {
     let ack: CgMessage = null;
     let client_id = message.client_from
     // msgsToAck: [none, join, leave, send]
-    if (CgServerDriver.msgsToAck.includes(message.type)) {
+    if (message.expectsAck()) {
       ack = new CgMessage({ type: CgType.ack, success: true, cause: "auto-approve", client_id })
       console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote.port})
     }
