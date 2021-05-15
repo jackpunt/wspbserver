@@ -24,6 +24,11 @@ export class CgServerDriver extends CgBase<CgMessage> {
   group_name: string;  // group to which this connection is join'd
   nak_count: number;   // for dubious case of client nak'ing a request.
 
+  /** identify port before joined. 
+   * @override client-only version in CgBase
+   */
+  get client_port() { return this.client_id !== undefined ? this.client_id : `${this.remote.addr}:${this.remote.port}`}
+
   /** the extant ClientGroup matching this.group_name. */
   get group() { return CgServerDriver.groups[this.group_name] }
   /** find lowest client_id not currently in use. */
@@ -86,8 +91,6 @@ export class CgServerDriver extends CgBase<CgMessage> {
     console.log(stime(this, ".sendAck:"), `${this.client_id} ->`, {cause, ...mopts} )
     return super.sendAck(cause, opts)
   }
-  /** identify port before joined. */
-  get client_port() { return this.client_id !== undefined ? this.client_id : `${this.remote.addr}:${this.remote.port}`}
   /**
    * process an incoming message from client.
    * @param message
@@ -96,14 +99,13 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   parseEval(message: CgMessage): void {
     message.client_from = this.client_id
-    console.log(stime(this, ".parseEval"), `${this.client_port} <-`, this.innerMessageString(message))
     if (message.type != CgType.join && this.client_id === undefined) {
-      console.log(stime(this, ".parseEval:"), "nak & ignore message from non-member", this.client_port)
+      console.log(stime(this, `.parseEval[${this.client_id}] <-`), this.innerMessageString(message), "nak & ignore message from non-member")
       this.sendNak("not a member", { group: this.group_name })
       return
     }
     if (!this.ack_resolved && message.type != CgType.ack) {
-      console.log(stime(), "sendNak: outstanding ack, cannot do", message.type)
+      console.log(stime(this, `.parseEval[${this.client_id}] <-`), this.innerMessageString(message), "nak: waiting for ack of", this.innerMessageString(this.ack_message))
       this.sendNak("need to ack: " + this.ack_message_type)
       return
     }
@@ -315,10 +317,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   /** @override for logging */
   sendToSocket(message: CgMessage): AckPromise {
-    let msg = this.innerMessageString(message)
-    console.log(stime(this, `.sendToSocket[${this.client_port}] ->`), message.cgType, {client_id: message.client_id, msg: msg, port: this.remote.port})
+    let msg = this.innerMessageString(message), port = this.remote.port, client_id = message.client_id
+    console.log(stime(this, `.sendToSocket[${this.client_id}] ->`), message.cgType, {client_id, msg, port})
     let ackPromise = super.sendToSocket(message) // sets this.promise_to_ack 
-
     return ackPromise
   }
 
