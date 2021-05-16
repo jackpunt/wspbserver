@@ -231,7 +231,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
   }
   /** 
    * sendToReferee(), sendToGroup(), sendAck() when done 
-   * @param message forward this CgMessage<pbMessage> to Group.
+   * @param message forward this CgMessage\<pbMessage> to Group.
    * @override
    */
   eval_send(message: CgMessage): void {
@@ -347,7 +347,7 @@ class CgAutoAckDriver extends CgServerDriver {
   get remote(): Remote { return { addr: "CgAutoAckDriver", port: 0, family: "" } }
   /**
    * @override There is no dnstream Socket; don't 'send' anything.
-   * @return a Promise<Ack> that is resolved (without send/recv/eval)
+   * @return a Promise\<Ack> that is resolved (without send/recv/eval)
    */
   sendToSocket(message: CgMessage): AckPromise {
     let rv = new AckPromise(message)
