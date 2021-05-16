@@ -87,7 +87,7 @@ export class WssListener {
 	
 	/** 
 	 * Promise fulfills when server is Listening; rejects if error (EADDRINUSE). 
-	 * @return EzPromise\<this\> where this.wss is the ws.Server
+	 * @return EzPromise\<this> where this.wss is the ws.Server
 	 */
 	startListening(): EzPromise<this> {
 		return this.make_wss_server(this.hostname, this.port)
@@ -115,7 +115,7 @@ export class WssListener {
 	}
 	/** 
 	 * Promise fulfills when server is Listening; rejects if error (ex: EADDRINUSE). 
-	 * @return EzPromise\<this\> where this.wss is the ws.Server
+	 * @return EzPromise\<this> where this.wss is the ws.Server
 	 */
 	make_wss_server(host: string, port: number): EzPromise<this> {
 		// console.log('%s try listen on %s:%d', moment().format(fmt), host, port);
