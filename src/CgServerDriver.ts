@@ -50,18 +50,18 @@ export class CgServerDriver extends CgBase<CgMessage> {
     super.connectDnStream(dnstream)
     if (dnstream instanceof ServerSocketDriver) {
       // get signaling from server-side/Node.js socket:
-			//dnstream.wsopen = (ev: ws$WebSocket.OpenEvent) => {}    // super() -> log
-			//dnstream.wserror = (ev: ws$WebSocket.ErrorEvent) => {}  // super() -> log
-      //dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
+			// dnstream.wsopen = (ev: ws$WebSocket.OpenEvent) => {}    // super() -> log
+			// dnstream.wserror = (ev: ws$WebSocket.ErrorEvent) => {}  // super() -> log
+      // dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
       dnstream.wsclose = (ev: ws$WebSocket.CloseEvent) => {
         let { target, wasClean, reason, code } = ev
-        console.log(stime(), `CgServerDriver.dnstream.wsclose[${this.client_id}]`, { code, reason, wasClean })
         let ndx = this.group && this.group.findIndex(client => client === this);
+        console.log(stime(this.dnstream, `.wsclose`), `[${this.client_id}]`, { code, reason, wasClean, ndx})
         if (ndx >= 0) {
           let type = CgType.leave, client_id = this.client_id, cause = "closed", nocc = true, group = this.group.aname
           let message = new CgMessage({ type, client_id, cause, group, nocc })
           this.sendToMembers(message, true) // tell others this client has gone (ignore acks)
-          this.remove_from_group()  // remove this client-cnx from group
+          this.removeFromGroup()  // remove this client-cnx from group
         }
       }
     }
@@ -186,12 +186,11 @@ export class CgServerDriver extends CgBase<CgMessage> {
   }
 
   /** when client leaves group: what happens at group[client_id] ??  mark it 'left'? */
-  remove_from_group(promises?: CgMessage[]) {
-    console.log(stime(this, ".remove_from_group: cid="), this.client_id, this.group.members)
+  removeFromGroup(promises?: CgMessage[]) {
+    console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
     let this_group = this.group.filter(csd => csd.client_id !== this.client_id) as ClientGroup;
     CgServerDriver.groups[this.group_name] = this_group
-    console.log(stime(this, ".remove_from_group: cid="), this.client_id, this.group.members)
-    //this.client_id = undefined
+    console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
 
     if (this.group.length > 0 && this.client_id === 0) {
       // ref has disconnected! Replace with auto-ack:
@@ -201,11 +200,11 @@ export class CgServerDriver extends CgBase<CgMessage> {
     if (this.group.length === 1 && this.group[0] instanceof CgServerDriver) {
       // tell the referee to leave:
       let ref = this.group[0]
-      console.log(stime(this, ".remove_from_group: group[0] ref ="), ref.remote)
+      console.log(stime(this, ".removeFromGroup: group[0] ref ="), ref.remote)
       let message = new CgMessage({ type: CgType.leave, client_id: 0, cause: "all others gone" })
       let pack = ref.sendToSocket(message); // eval_leave & send Ack
       pack.finally(() => {
-        console.log(stime(this, ".remove_from_group: cid="), this.client_id, this.group.members)
+        console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
       })
       return
     }
@@ -218,12 +217,14 @@ export class CgServerDriver extends CgBase<CgMessage> {
   /** this client leaving; inform others? see also: dnstream.wsclose(reason, code, wasClean) */
   eval_leave(message: CgMessage): void {
     console.log(stime(this, `.eval_leave[${this.client_id}] <-`), this.innerMessageString(message))
-    // in CgClient, cases for: isReferee[ack it], isSelf[go away], other[inform, change avatar?]
-    // here it came from client seeking to leave, tell referee, tell others; sendAck
+    // in CgBase/Client: cases for: isSelf[go away], other[inform, change avatar?]
+    // in CgRefClient/CmReferee: edit roster
+    // in CgServer[here]: from client seeking to leave, sendToGroup, removeFromGroup; ack
+    // in CgServer: also detect dnstream.wsclose and likewise removeFromGroup()
     message.nocc = true
     let remove_from_group = (promises?: CgMessage[]) => { 
       this.sendAck(message.cause, {group: this.group_name, client_id: this.client_id})
-      this.remove_from_group(promises) 
+      this.removeFromGroup(promises) 
     }
     this.sendToGroup(message, null, null, remove_from_group)
     // when this.group.find(g => g.waiting_for_ack) == false --> sendAck()

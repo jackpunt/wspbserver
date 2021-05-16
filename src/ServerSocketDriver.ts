@@ -41,6 +41,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 	wsopen(ev: ws$WebSocket.OpenEvent) {
 		console.log(stime(), "SSD: open", ev)
 	}
+	/** default listener, ok to override. */
 	wsclose(ev: ws$WebSocket.CloseEvent) {
 		let { target, wasClean, reason, code } = ev
 		console.log(stime(), "SSD: close", {code, reason, wasClean})
@@ -58,6 +59,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
     if (!!this.upstream) this.upstream.wsmessage(data)
   };
 	connectWebSocket(wss: ws$WebSocket | WebSocket | string) {
+		// use alternate server-side Events and handlers:
 		if (wss instanceof ws$WebSocket) {
 			this.wss = wss
 			// TODO: something useful with this.{onopen, onclose, onerror} or this.wss.{onopen, onclose, onerror}
