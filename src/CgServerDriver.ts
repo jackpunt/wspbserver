@@ -68,9 +68,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     return this
   }
 
-  isReferee(): boolean {
-    return this.client_id === 0
-  }
+  get isReferee(): boolean { return this.client_id === 0 }
   /** referee never[?] initiates a move; can Nak a move; replies to draw/shuffle/next-Turn-Player; 
    * [in 2-player P-v-P (no ref) each player acts as referee to the other?]
    * may need a way to tell client they are the referee/moderator
@@ -126,8 +124,11 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * @override
    */
   eval_nak(message: CgMessage, req: CgMessage): void {
-    if (this.isReferee()) {
+    if (this.isReferee) {
       let client = this.group[message.client_id]
+      if (!client) {
+        console.log(stime(this, `.eval_nak`), { message, req })
+      }
       client.sendToSocket(message) // forward message to originator. (no client_waiting)
     } else {
       // Some non-ref client sent a NAK... we can't really help them.
@@ -251,7 +252,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     }
 
     let client_to = message.client_id    // could be null send to 'all'
-    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to || 'group'}`, this.innerMessageString(message))
+    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to || 'group'}`, this.innerMessageString(message), 'nocc:', message.nocc)
     if (client_to !== undefined) {
       let promise = this.group[client_to].sendToSocket(message)
       promise.then(send_ack_done, send_failed)
@@ -275,7 +276,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
         alldone.finally(on_fin) // ignore any throw()
         // this.handlePromiseAll(alldone, on_ack, on_rej, null, on_fin)
     }
-    if (this.isReferee()) {
+    if (this.isReferee) {
       sendToOthers(message) // referee sending a broadcast
     } else {
       this.sendToReferee(message).then((ack) => {
@@ -304,7 +305,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
   /** forward ack'd message to all of group. including the sender (unless nocc: true). */
   sendToMembers(message: CgMessage, andRef: boolean = false): Array<AckPromise> {
     // forward original message to all/other members of group
-    let cc_sender = !message.nocc, n0 = andRef ? -1 : 0
+    let cc_sender = !message.nocc, n0 = (andRef || (this.isReferee && message.nocc === false)) ? -1 : 0
     let promises = Array<AckPromise>();
     this.group.forEach((member, ndx) => {
       if (ndx > n0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
