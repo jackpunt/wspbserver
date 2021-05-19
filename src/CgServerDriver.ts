@@ -252,7 +252,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     }
 
     let client_to = message.client_id    // could be null send to 'all'
-    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to || 'group'}`, this.innerMessageString(message), 'nocc:', message.nocc)
+    console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to === undefined? 'group': client_to}`, this.innerMessageString(message), 'nocc:', message.nocc)
     if (client_to !== undefined) {
       let promise = this.group[client_to].sendToSocket(message)
       promise.then(send_ack_done, send_failed)
