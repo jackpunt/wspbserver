@@ -130,6 +130,8 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * 
    * If (client_id == 0 && cause == 'referee') then make special assignment to client_id 0.
    * (see this.isFromReferee()); otherwise client_id = next_client_id and push onto end of group.
+   * 
+   * QQQQ: should 'join' requests be moderated by client_0 ? (to verify passcode or whatever)
    */
   eval_join(message: CgMessage): void {
     if (this.group_name !== undefined) {
@@ -149,8 +151,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
       CgServerDriver.groups[join_name] = group // add new group by name
       new CgAutoAckDriver(this.ref_join_message(join_name)) // TODO: spawn a referee, let it connect
     }
+    let isAutoAck = (group[0] instanceof CgAutoAckDriver)
     if (this.isRefereeJoin(message)) { 
-      if ((group[0] instanceof CgServerDriver) && !(group[0] instanceof CgAutoAckDriver)) {
+      if ((group[0] instanceof CgServerDriver) && !isAutoAck) {
        this.sendNak('referee exists', {group: join_name})
        return
       } 
@@ -160,8 +163,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
       this.client_id = this.next_id
       group.push(this) // push is ok: we splice out any defections (array is compact)
     }
+    let cause = isAutoAck ? "auto-approve" : "ref-approved"
     console.log(stime(this, ".eval_join group="), this.group.members, this.remote)
-    this.sendAck("joined", {client_id: this.client_id, group: join_name})
+    this.sendAck(cause, {client_id: this.client_id, group: join_name})
     return
   }
 
