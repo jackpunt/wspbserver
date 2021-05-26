@@ -265,7 +265,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     } else {
       this.sendToReferee(message).then((ack) => {
         if (ack.success) {
-          sendToOthers(message)
+          sendToOthers(this.refMessage(message, ack))
         } else {
           this.sendNak(ack.cause, this.ackOpts(ack))  // "illegal move"
         }
@@ -273,6 +273,10 @@ export class CgServerDriver extends CgBase<CgMessage> {
         this.sendNak(reason) // "network or application failed"
       })
     }
+  }
+  /** server can override/augment the message by including in Ack. */
+  refMessage(orig: CgMessage, ack: CgMessage): CgMessage {
+    return (!!ack.msg) ? CgMessage.deserialize(ack.msg) : orig
   }
 
   sendToReferee(msg: CgMessage) {
