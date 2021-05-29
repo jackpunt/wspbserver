@@ -79,17 +79,10 @@ export class CgServerDriver extends CgBase<CgMessage> {
   ref_join_message(group: string, client_id: number = 0, cause:string = "referee") {
     return new CgMessage({type: CgType.join, client_id, group, cause })
   }
-  /** extract useful Opts from Ack/Nak, reduce AckMessage to CgMessageOpts. */
-  ackOpts(opts: CgMessageOpts): CgMessageOpts {
-    if (opts instanceof CgMessage) {
-      let { client_id, success, client_from } = opts; 
-      return { client_id, success, client_from }
-    }
-    return opts
-  }
+  // override for debug/logging
   sendAck(cause: string, opts?: CgMessageOpts): AckPromise {
-    let mopts = this.ackOpts(opts)
-    console.log(stime(this, ".sendAck:"), `${this.client_id} ->`, {cause, ...mopts} )
+    let mopts = (opts instanceof CgMessage) ? opts.outObject() : opts
+    console.log(stime(this, ".sendAck:"), `${this.client_id} ->`, { cause, ...mopts })
     return super.sendAck(cause, opts)
   }
   /**
@@ -116,13 +109,13 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * @override
    */
   eval_ack(message: CgMessage, req: CgMessage): void {
-    return // super.eval_ack will fulfill this.ack_promise
+    return // super.parseEval will fulfill this.ack_promise
   }
   /**
    * @override
    */
   eval_nak(message: CgMessage, req: CgMessage): void {
-    return // super.eval_nak will fulfill this.ack_promise
+    return // super.parseEval will fulfill this.ack_promise
     // TODO: sendToOthers to relay any 'Nak' (in the promise[]) back to caller.
     // The application can then decide to rescind or resend the action
   }
@@ -165,7 +158,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     }
     let cause = isAutoAck ? "auto-approve" : "ref-approved"
     console.log(stime(this, ".eval_join group="), this.group.members, this.remote)
-    this.sendAck(cause, {client_id: this.client_id, group: join_name})
+    this.sendAck(cause, { client_id: this.client_id, group: join_name })
     return
   }
 
@@ -221,17 +214,17 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   eval_send(message: CgMessage): void {
     // send "done" to origin when everyone has replied. unless ref Nak's it...
-    let send_ack_done = (ack: CgMessage) => { 
+    let send_ack_done = (ack: CgMessage) => {
       //console.log(stime(this, ".eval_send: one/specific ack"), this.client_id, ack.success)
-      this.sendAck(ack.cause, this.ackOpts(ack))
+      this.sendAck(ack.cause, ack) // Ack OR Nak
     } // the Ack from addressed client_id (referee)
-    let send_all_done = (all_done: CgMessage[]) => { 
+    let send_all_done = (all_done: CgMessage[]) => {
       //console.log(stime(this, ".eval_send: sendAck for all_done"), this.client_id)
-      this.sendAck("send_done") 
+      this.sendAck("send_done")
     }
-    let send_failed = (reason: any) => { 
+    let send_failed = (reason: any) => {
       //console.log(stime(this), "send failed: ", reason); 
-      this.sendNak("send failed: "+reason)
+      this.sendNak(`send failed: ${reason}`)
     }
 
     let client_to = message.client_id    // could be null send to 'all'
@@ -267,16 +260,18 @@ export class CgServerDriver extends CgBase<CgMessage> {
         if (ack.success) {
           sendToOthers(this.refMessage(message, ack))
         } else {
-          this.sendNak(ack.cause, this.ackOpts(ack))  // "illegal move"
+          this.sendNak(ack.cause, ack)  // "illegal move"
         }
       }, (reason) => {
         this.sendNak(reason) // "network or application failed"
       })
     }
   }
-  /** server can override/augment the message by including in Ack. */
+  /** For CgType.send, Referee can supply a [CgType.send] message to be sent by including in Ack. */
   refMessage(orig: CgMessage, ack: CgMessage): CgMessage {
-    return (!!ack.msg) ? CgMessage.deserialize(ack.msg) : orig
+    let msg = (ack.msg !== undefined) ? CgMessage.deserialize(ack.msg) : orig
+    console.log(stime(this, `.refMessage`), msg.outObject())
+    return msg
   }
 
   sendToReferee(msg: CgMessage) {
@@ -297,7 +292,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
     let promises = Array<AckPromise>();
     this.group.forEach((member, ndx) => {
       if (ndx > n0 && (cc_sender || (member != this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
-        console.log(stime(this, `.sendToMembers[${this.client_id}] ->`), member.client_id)
+        console.log(stime(this, `.sendToMembers[${this.client_id}] ->`), member.client_id, message.msgStr)
         promises.push(member.sendToSocket(message))
       }
     })
@@ -307,8 +302,8 @@ export class CgServerDriver extends CgBase<CgMessage> {
 
   /** @override for logging */
   sendToSocket(message: CgMessage): AckPromise {
-    let client_id = message.client_id, msg = this.innerMessageString(message), port = this.remote.port
-    console.log(stime(this, `.sendToSocket[${this.client_id}] ->`), message.cgType, {client_id, msg, port})
+    let client_id = message.client_id, msgStr = this.innerMessageString(message), port = this.remote.port
+    console.log(stime(this, `.sendToSocket[${this.client_id}] ->`), message.cgType, {client_id, msgStr, port})
     return super.sendToSocket(message) // sets this.promise_to_ack 
   }
 
