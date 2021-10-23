@@ -1,6 +1,6 @@
 {
   "name": "wspbserver",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "WebSocket Protobuf Server for Client-Group proto",
   "main": "dist/index.js",
   "files": [
