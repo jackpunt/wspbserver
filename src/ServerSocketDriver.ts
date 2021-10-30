@@ -1,5 +1,5 @@
 import * as ws$WebSocket from "ws";
-import { DataBuf, pbMessage, WebSocketBase, stime, AWebSocket, AnyWSD, UpstreamDrivable, CLOSE_CODE } from "wspbclient";
+import { DataBuf, pbMessage, WebSocketBase, stime, AWebSocket, AnyWSD, UpstreamDrivable, CLOSE_CODE } from "@thegraid/wspbclient";
 import type { Remote } from "./wspbserver";
 
 // type SSD<T extends pbMessage> = ServerSocketDriver<T>

@@ -1,4 +1,4 @@
-import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, EzPromise, pbMessage, stime, UpstreamDrivable } from "wspbclient";
+import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, EzPromise, pbMessage, stime, UpstreamDrivable } from "@thegraid/wspbclient";
 import { ServerSocketDriver } from "./ServerSocketDriver";
 import type * as ws$WebSocket from "ws";
 import type { Remote } from "./wspbserver";

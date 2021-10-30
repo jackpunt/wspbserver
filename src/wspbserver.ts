@@ -5,7 +5,7 @@ import * as dns from "dns";
 import * as ws from "ws";
 import { EzPromise } from "@thegraid/EzPromise";
 import { ServerSocketDriver } from "./ServerSocketDriver";
-import type { AnyWSD, pbMessage } from "wspbclient";
+import type { AnyWSD, pbMessage } from "@thegraid/wspbclient";
 
 
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
