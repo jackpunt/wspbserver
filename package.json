@@ -1,5 +1,5 @@
 {
-  "name": "wspbserver",
+  "name": "@thegraid/wspbserver",
   "version": "1.4.3",
   "description": "WebSocket Protobuf Server for Client-Group proto",
   "main": "dist/index.js",
@@ -35,11 +35,11 @@
   "homepage": "https://github.com/jackpunt/wspbserver#readme",
   "dependencies": {
     "@thegraid/ezpromise": "^1.0.4",
+    "@thegraid/wspbclient": "file:../../ts/wspbclient",
     "google-protobuf": "*",
     "moment": "^2.29.1",
     "tslib": "^2.1.0",
-    "ws": "^7.4.4",
-    "wspbclient": "file:../../ts/wspbclient"
+    "ws": "^7.4.4"
   },
   "devDependencies": {
     "@types/google-protobuf": "^3.7.4",
