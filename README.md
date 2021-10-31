@@ -4,7 +4,7 @@
 
 wspbserver is basically a 'chatroom' server for websocket/protobuf applications.
 
-The Client-Group protocol (CgProto) has commands to Join, Leave, Send & Ack/Nak.
+The Client-Group protocol (CgProto, from [wsbpclient](https://github.com/jackpunt/wsbpclient)) has commands to Join, Leave, Send & Ack/Nak.
 
 client apps join a group, get a client_id (~ the socket-id) and can then post messages to the group, and recieve copies of messages that other clients send. Messages are 'flow-controlled' by requiring an ACK from each client before proceeding to the next message, so clients stay synch'd.
 
