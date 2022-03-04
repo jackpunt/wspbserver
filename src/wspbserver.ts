@@ -39,7 +39,7 @@ export interface WsServerOptions extends ws.ServerOptions {
 	backlog?: number,
 	server?: http.Server | https.Server, 
 	verifyClient?: ws.VerifyClientCallbackAsync | ws.VerifyClientCallbackSync, 
-	handleProtocols?: () => void,
+	handleProtocols?: () => string | false, // choose from client-offered protocols
 	path?: string,  // restrict websocket to [urls with] path
 	noServer?: boolean, 
 	perMessageDeflate?: boolean | ws.PerMessageDeflateOptions, 
