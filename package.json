@@ -1,6 +1,6 @@
 {
   "name": "@thegraid/wspbserver",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "WebSocket Protobuf Server for Client-Group proto",
   "main": "dist/index.js",
   "files": [
@@ -47,7 +47,6 @@
     "@types/jest": "^27.3.1",
     "@types/node": "*",
     "@types/ws": "^7.4.1",
-
     "chrome-launcher": "^0.13.4",
     "jest": "^27.3.1",
     "ts-jest": "^27.0.7",
