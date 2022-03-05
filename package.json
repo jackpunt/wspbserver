@@ -7,6 +7,7 @@
     "dist"
   ],
   "scripts": {
+    "pub": "npm run build; npm version ${1:-patch}; npm publish --access public",
     "echo": "node dist/echoserver.js",
     "cgserver": "node dist/cg-server.js",
     "testns": "jest --runInBand --force-exit --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
