@@ -16,7 +16,7 @@ const cgserver: WSSOpts = {
 	port: port,
 	keydir: "/Users/jpeck/keys/"
 }
-console.log(stime(), "listen at:", `${hostname}${cgserver.domain}:${cgserver.port}`, process.argv)
+console.log(stime(undefined, "wss-listener"), "listen at:", `${hostname}${cgserver.domain}:${cgserver.port}`, process.argv)
 
 
 let cnxl: WssListener = new WssListener(hostname, cgserver, CgServerDriver);
