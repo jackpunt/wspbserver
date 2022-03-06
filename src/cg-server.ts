@@ -11,11 +11,11 @@ const cgserver: WSSOpts = {
 	port: port,
 	keydir: "/Users/jpeck/keys/"
 }
-console.log(stime(undefined, "cg-server"), "listen at:", `${host}${cgserver.domain}:${cgserver.port}`, process.pid)
+console.log(stime(undefined, "cg-server"), "begin", `${host}${cgserver.domain}:${cgserver.port}`, process.pid)
 // WssListener injects its own SSD<ws$WebSocket> at the bottom of the stack
 let cnxlp = new WssListener(host, cgserver, CgServerDriver ).startListening()
 cnxlp.then((cnxl) => {
-	console.log("listening %s:%d", cnxl.hostname, cnxl.port)
+	console.log(stime(undefined, "cg-server"), `listening ${cnxl.hostname}:${cnxl.port}`, process.pid)
 }, (reason) => {
-	console.log("reject:", reason)
+	console.log(stime(undefined, "cg-server"), "reject:", reason)
 })
