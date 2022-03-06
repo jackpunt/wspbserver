@@ -1,7 +1,7 @@
 import { WSSOpts, WssListener, CgServerDriver } from '.';
 import { AnyWSD, stime } from '@thegraid/wspbclient';
 
-function wssserver(logName: string, driver: new () => AnyWSD, defHost: string, defPort: string) {
+export function wssServer(logName: string, driver: new () => AnyWSD, defHost: string, defPort: string) {
   let host = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == "Xname")) || defHost
   let portStr = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == "Xport")) || defPort
   let port = Number.parseInt(portStr)
@@ -20,4 +20,4 @@ function wssserver(logName: string, driver: new () => AnyWSD, defHost: string, d
     console.log(stime(undefined, logName), "reject:", reason)
   })
 }
-wssserver('cgserver', CgServerDriver, 'game7', '8444')
+wssServer('cgserver', CgServerDriver, 'game7', '8444')
