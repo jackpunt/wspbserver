@@ -5,9 +5,10 @@ import * as dns from "dns";
 import * as ws from "ws";
 import { EzPromise } from "@thegraid/EzPromise";
 import { ServerSocketDriver } from "./ServerSocketDriver";
-import type { AnyWSD, pbMessage } from "@thegraid/wspbclient";
+import { AnyWSD, pbMessage, stime } from "@thegraid/wspbclient";
 
-
+/** class/constructor for AnyWSD [a WebSocketDriver for browser or ws/nodejs WebSocket] */
+export type WSDriver = (new () => AnyWSD)
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
 declare module 'ws' {
   export interface WebSocket extends ws { }
@@ -65,16 +66,23 @@ export class WssListener {
 	/** ServerSocketDriver class contructor. */
 	SSD: (new (remote?: Remote) => ServerSocketDriver<pbMessage>) = ServerSocketDriver;
 	drivers: (new()=>AnyWSD)[]
+  httpsServer: https.Server;
 	wss: ws.Server
+  baseOpts: WsServerOptions = {
+		binaryType: 'arraybuffer',
+		perMessageDeflate: false
+	}
+  static stateNames = ['OPEN', 'CLOSING', 'CLOSED']
+  get state() { return WssListener.stateNames[this.wss['_state']] }
 
 	/**
 	 * Listen for connections;  
 	 * Make stream from ServerSocketDriver up through given Drivers
 	 * @param basename identifies the hostname and the key/cert alias
 	 * @param wssOpts {domain, port, keypath}
-	 * @param Drivers any stackable WebSocketDriver
+	 * @param drivers any stackable WebSocketDriver
 	 */
-	constructor(basename: string, wssOpts: WSSOpts, ...Drivers: (new () => AnyWSD)[]) {
+	constructor(basename: string, wssOpts: WSSOpts, ...drivers: WSDriver[]) {
 		let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
@@ -82,21 +90,33 @@ export class WssListener {
     this.certpath = this.keydir + basename + '.cert.pem';
     this.hostname = basename + domain;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
-		this.drivers = Drivers
+		this.drivers = drivers
+		this.httpsServer = https.createServer(this.credentials, undefined)
+		this.wss = this.makeWsServer(this.httpsServer, this.baseOpts)
   }
 	
 	/** 
 	 * Promise fulfills when server is Listening; rejects if error (EADDRINUSE). 
+   * @param pListener an EzPromise: fulfill on 'listen'; reject on 'error'
 	 * @return EzPromise\<this> where this.wss is the ws.Server
 	 */
-	startListening(): EzPromise<this> {
-		return this.make_wss_server(this.hostname, this.port)
+	startListening(pListener = new EzPromise<WssListener>(), backlog?: number): EzPromise<WssListener> {
+    let wss = this.wss
+    wss.on('error', (error: Error) => { pListener.reject(error) })
+    wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.onconnection(ws, req));
+    this.httpsServer.listen(this.port, this.hostname, backlog, () => { pListener.fulfill(this) });
+		return pListener;
 	}
-	/** https.Server.listen(host, port) does not require DNS addr */
+  /** close httpsServer & then wss */
+  close(cb?: (err: Error) => void) {
+    this.httpsServer.close((err) => { err; this.wss.close(cb) })
+  }
+	
+  /** https.Server.listen(host, port) does not require DNS addr */
   dnsLookup(hostname: string, callback: (addr: string, fam: number) => void, thisArg: any = this) {
 		dns.lookup(hostname, (err, addr, fam) => {
-			console.log('rv=', { err, addr, fam });
-			if (err) console.log("Error", { code: err.code, error: err })
+			console.debug(stime(this, `.dnsLookup: return =`), { err, addr, fam });
+			if (err) console.error(stime(this, `.dnsLookup: Error =`), { code: err.code, error: err, addr, fam })
 			else callback.call(thisArg, addr, fam)
 		})
 	}
@@ -106,30 +126,10 @@ export class WssListener {
 		return { key: privateKey, cert: certificate };
 	}
 
-  baseOpts: WsServerOptions = {
-		binaryType: 'arraybuffer',
-		perMessageDeflate: false
+	makeWsServer(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
+    return new ws.Server(Object.assign({ server: httpsServer }, opts));
 	}
-	wssUpgrade(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
-		return new ws.Server(Object.assign({}, opts, {server: httpsServer}));
-	}
-	/** 
-	 * Promise fulfills when server is Listening; rejects if error (ex: EADDRINUSE). 
-	 * @return EzPromise\<this> where this.wss is the ws.Server
-	 */
-	make_wss_server(host: string, port: number): EzPromise<this> {
-		// console.log('%s try listen on %s:%d', moment().format(fmt), host, port);
-		// pass in your express app and credentials to create an https server
-		let pserver = new EzPromise<this>()
-		let httpsServer = https.createServer(this.credentials, undefined)
-		let wss = this.wss = this.wssUpgrade(httpsServer)
-		wss.on('error', (error: Error)=>{ pserver.reject(error) })
-		wss.on('listening', () => { pserver.fulfill(this) })
-		wss.on('connection', (ws: ws.WebSocket, req: http.IncomingMessage) => this.onconnection(ws, req));
-		httpsServer.listen(port, host);
-		return pserver;
-	}
-	
+
 	/**
 	 * Invoked for each new connection to this server.
 	 * 

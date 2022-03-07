@@ -1,3 +1,3 @@
 import { CgServerDriver, wssServer } from '.';
 
-wssServer('cgserver', CgServerDriver, 'game7', '8444')
+wssServer(true, 'cgserver', 'game7', '8444', CgServerDriver)
