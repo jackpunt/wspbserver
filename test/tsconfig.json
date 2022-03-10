@@ -2,11 +2,7 @@
   "extends": "../tsconfig.json",
   "files": [
     "CgServer.spec.ts",
-    "wssListen.spec.ts",
-    "wsWebSocket.ts",
-    "wsWebSocketBase.ts",
-    "testCnx.ts",
-    "testCgCnx.ts"
+    "wssListen.spec.ts"
   ],
   "include": [
     "test/*.ts"
