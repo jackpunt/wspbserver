@@ -1,13 +1,16 @@
 import { WSSOpts, WssListener, WSDriver } from '.';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
+/** get from common-lib */
+function argVal(name: string, defVal: string, k: string = '--'): string {
+  const envVal = process.env[name] || defVal
+  const argKey = (k == '=') ? `${name}${k}` : `${k}${name}`
+  const argVal = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == argKey)) || envVal
+  return argVal
+}
 export function srvrOpts(defHost = 'game7', defPort = '8443', k: string = '--'): WSSOpts {
-  const envHost = process.env["host"] || defHost
-  const envPort = process.env["port"] || defPort
-  const hostKey = (k == '=') ? `host${k}` : `${k}host`
-  const portKey = (k == '=') ? `port${k}` : `${k}port`
-  const host = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == hostKey)) || envHost
-  const portStr = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == portKey)) || envPort
+  const host = argVal('host', defHost)
+  const portStr = argVal('port', defPort)
   const port = Number.parseInt(portStr)
 
   const svropts: WSSOpts = {

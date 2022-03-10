@@ -31,18 +31,18 @@ export class wsWebSocketBase<I extends pbMessage, O extends pbMessage> extends W
     }
     super.connectWebSocket(ws)
 
-    this.ws.addEventListener('error', (ev: Event) => {
-      console.log(stime(this, " ws error:"), ev)
+    this.ws.addEventListener('error', (ev: ErrorEvent) => {
+      console.log(stime(this, " ws_error:"), ev.message)
       !!closeP && closeP.fulfill(close_fail)
     })
 
     this.ws.addEventListener('open', (ev) => {
-      console.log(stime(this, " ws open:"), !!openP ? "   openP.fulfill(ws)" : "    no Promise")
+      console.log(stime(this, " ws_open:"), !!openP ? "   openP.fulfill(ws)" : "    no Promise")
       !!openP && openP.fulfill(this.ws)
     })
 
     this.ws.addEventListener('close', (ev: CloseEvent) => {
-      console.log(stime(this, " ws close:"), { readyState: readyState(this.ws), reason: ev.reason, closeP : !!closeP })
+      console.log(stime(this, " ws_close:"), { readyState: readyState(this.ws), reason: ev.reason, closeP : !!closeP })
       !!closeP && closeP.fulfill(normalClose(ev.reason))
     })
     return this

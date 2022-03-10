@@ -13,12 +13,11 @@ openP.then(opened, rejected).catch(catchRej)
 function rejected(reason: any) { console.log(stime(), `rejected: ${reason}`)}
 function catchRej(reason: any) { console.log(stime(), `catchRej: ${reason}`)}
 function opened(ws: WebSocket) {
-  console.log(stime(), `opened`)
+  console.log(stime(), `opened:`, ws.url)
   closeStream(wsbase)
 }
 
 function closeStream(wsbase: WebSocketBase<pbMessage, pbMessage>) {
-  console.log(stime(), "client0 OPEN")
   console.log(stime(), `try closeStream(normal, '${close_normal.reason}')`)
   try {
     wsbase.closeStream(close_normal.code, close_normal.reason) // wsbase.ws.close(code, reason)
@@ -42,7 +41,6 @@ const echourl = buildURL('wss', host, 'thegraid.com', 8443)   // "wss://game7.th
 const servurl = buildURL('wss', host, 'thegraid.com', port)   // "wss://game7.thegraid.com:8444"
 const testurl: string = servurl;
 const echoserver: boolean = (testurl == echourl) // if echoserver, don't expect server to ACK msgs
-console.log(`testCgCnx:`, testurl)
-
+console.log(`testCnx:`, testurl)
 let wsDriver = wsbase.connectWebSocket(testurl, openP, closeP)
 // startListening(cnxl, 'testCnx', cnxlp)
