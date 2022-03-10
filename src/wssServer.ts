@@ -2,7 +2,7 @@ import { WSSOpts, WssListener, WSDriver } from '.';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
 /** get from common-lib */
-function argVal(name: string, defVal: string, k: string = '--'): string {
+export function argVal(name: string, defVal: string, k: string = '--'): string {
   const envVal = process.env[name] || defVal
   const argKey = (k == '=') ? `${name}${k}` : `${k}${name}`
   const argVal = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == argKey)) || envVal

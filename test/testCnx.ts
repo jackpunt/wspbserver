@@ -4,7 +4,7 @@ import { wsWebSocket } from "./wsWebSocket"
 import { EzPromise } from '@thegraid/ezpromise'
 import { pbMessage, CloseInfo, close_fail, close_normal, readyState } from '@thegraid/wspbclient'
 import type { AWebSocket, WebSocketBase } from '@thegraid/wspbclient'
-import { srvrOpts, startListening, wssServer} from '../src'
+import { argVal } from '../src'
 
 const wsbase = new wsWebSocketBase<pbMessage, pbMessage>()
 
@@ -35,12 +35,12 @@ function closed(cinfo: any) {
   console.log(stime(), "client CLOSED:", cinfo, readyState(wsbase.ws))
   setTimeout(() => { console.log(stime(), "client END OF TEST!") }, 10)
 }
+let host = argVal('host', 'game7', 'X')  // jest-compatible: Xhost game6
+let portStr = argVal('port', '8444', 'X'), port = Number.parseInt(portStr)
 
-const { host, port } = srvrOpts('game7', '8444', 'X')  // jest-compatible: Xhost game6
 const echourl = buildURL('wss', host, 'thegraid.com', 8443)   // "wss://game7.thegraid.com:8443"
 const servurl = buildURL('wss', host, 'thegraid.com', port)   // "wss://game7.thegraid.com:8444"
 const testurl: string = servurl;
 const echoserver: boolean = (testurl == echourl) // if echoserver, don't expect server to ACK msgs
 console.log(`testCnx:`, testurl)
 let wsDriver = wsbase.connectWebSocket(testurl, openP, closeP)
-// startListening(cnxl, 'testCnx', cnxlp)

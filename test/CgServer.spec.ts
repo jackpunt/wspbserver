@@ -132,20 +132,6 @@ describe("Opening", () => {
     })
   })
 
-  //let pwsbase: EzPromise<wsWebSocketBase<pbMessage, pbMessage>>;// = new EzPromise<wsWebSocketBase<pbMessage, pbMessage>>()
-  //let pwsbase: EzPromise<wsWebSocketBase<pbMessage, pbMessage>> = new EzPromise<wsWebSocketBase<pbMessage, pbMessage>>()
-
-  // const pCgClient = new EzPromise<CgClient<pbMessage>>();  // fulfill when stacked
-  // test("wsbase.push CgClient", () => {
-  //   return pwsbase.then((wsbase) => {
-  //     console.log(stime(), "CgClient.connectDnStream try push CgClient Driver")
-  //     cgclient.connectDnStream(wsbase)
-  //     expect(cgclient.dnstream).toBe(wsbase)
-  //     expect(wsbase.upstream).toBe(cgclient)
-  //     pCgClient.fulfill(cgclient)
-  //   })
-  // })
-
   test("wsbase.ws connected & OPEN", () => {
     return openP.then((ws) => {
       expect(ws).toBeInstanceOf(wsWebSocket)
