@@ -1,17 +1,12 @@
 import { className, EzPromise, stime } from "@thegraid/wspbclient";
 import { Server as HttpsServer } from "https";
 //import { CLOSING, CLOSED } from "ws";
-import { CgServerDriver, startListening, WssListener, wssServer } from "../src";
+import { CgServerDriver, srvrOpts, startListening, WssListener, wssServer } from "../src";
 
 // jest will NOT pass useful args to test file
-let envhost = process.env["host"] || 'game7'
-let envport = process.env["port"] || '8444'
-let hostname = process.argv.find((val, ndx, ary) => (ndx>0 && ary[ndx-1] == "host=")) || envhost
-let portStr = process.argv.find((val, ndx, ary) => (ndx>0 && ary[ndx-1] == "port=")) || envport
-let port = Number.parseInt(portStr)
-
+let srvropts = srvrOpts('game6', '8443', '=')
 let isListening = new EzPromise<WssListener>()
-let info = wssServer(isListening, 'testListen', hostname, portStr, CgServerDriver ) // NOT startListening()
+let info = wssServer(isListening, 'testListen', srvropts, CgServerDriver ) // NOT startListening()
 let cnxl = info.cnxl
 
 test("WssListener.constructor", () => {
@@ -23,18 +18,18 @@ test("WssListener.constructor", () => {
 
 test("isListening", () => {
   return isListening.then((wssl) => {
-    expect(wssl.port).toEqual(port)
-    expect(wssl.hostname).toEqual(`${hostname}${info.svropts.domain}`);
+    expect(wssl.port).toEqual(srvropts.port)
+    expect(wssl.hostname).toEqual(`${info.host}.${srvropts.domain}`);
   }, (reason) => {
     expect(reason.code).toMatch(/EADDRINUSE|EADDRNOTAVAIL/)
     expect(reason.code).toBeNull()
   }).finally(() => {
     cnxl.close((err) => { 
-      console.log(stime(), `WssListener closed`, '_state=', cnxl.state, 'err=', err)
+      console.log(stime(), `WssListener closed`, 'state=', cnxl.state, 'err=', err)
       closeDone.fulfill()
     })
     // httpsServer & cnxl.wss both have already fired their 'close' callbacks!
-    console.log(stime(), `cnxl.close called: _state=`, cnxl.state)
+    console.log(stime(), `cnxl.close called: state=`, cnxl.state)
   })
 })
 let closeDone = new EzPromise<void>()
@@ -43,8 +38,8 @@ test("closeDone", () => {
     expect(cnxl.state).toBe('CLOSED')
   })
 })
-// test("timetolog", () => {
-//   return new Promise<void>((fulfill) => {
-//     setTimeout(() => { fulfill() }, 500)
-//   })
-// }) 
+test("timetolog", () => {
+  return new Promise<void>((fulfill) => {
+    setTimeout(() => { fulfill() }, 10)
+  })
+}) 

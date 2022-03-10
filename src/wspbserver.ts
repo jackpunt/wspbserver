@@ -25,7 +25,7 @@ export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
 export enum CLOSE_CODE { NormalCLosure = 1000, EndpointUnavailable = 1001, Empty = 1005 }
 
 /** parameters for WebSocket Secure Listener */
-export interface  WSSOpts { domain: string, port: number, keydir: string, }
+export interface  WSSOpts { host: string, domain: string, port: number, keydir: string, }
 
 /** a subset of https.ServerOptions */
 export type Credentials = https.ServerOptions // {key: string, cert: string}
@@ -86,9 +86,9 @@ export class WssListener {
 		let { domain, port, keydir } = wssOpts
     this.port = port;
     this.keydir = keydir;
-    this.keypath = this.keydir + basename + '.key.pem';
-    this.certpath = this.keydir + basename + '.cert.pem';
-    this.hostname = basename + domain;
+    this.keypath = `${this.keydir}${basename}.key.pem`;
+    this.certpath = `${this.keydir}${basename}.cert.pem`;
+    this.hostname = `${basename}.${domain}`;
     this.credentials = this.getCredentials(this.keypath, this.certpath)
 		this.drivers = drivers
 		this.httpsServer = https.createServer(this.credentials, undefined)

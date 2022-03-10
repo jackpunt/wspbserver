@@ -1,21 +1,32 @@
 import { WSSOpts, WssListener, WSDriver } from '.';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
-export function wssServer(cnxlp: boolean | EzPromise<WssListener>, logName: string, defHost: string, defPort: string, ...drivers: WSDriver[]) {
-  const host = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == "--host")) || defHost
-  const portStr = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == "--port")) || defPort
+export function srvrOpts(defHost = 'game7', defPort = '8443', k: string = '--'): WSSOpts {
+  const envHost = process.env["host"] || defHost
+  const envPort = process.env["port"] || defPort
+  const hostKey = (k == '=') ? `host${k}` : `${k}host`
+  const portKey = (k == '=') ? `port${k}` : `${k}port`
+  const host = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == hostKey)) || envHost
+  const portStr = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == portKey)) || envPort
   const port = Number.parseInt(portStr)
 
   const svropts: WSSOpts = {
-    domain: ".thegraid.com",
+    host: host,
+    domain: "thegraid.com",
     port: port,
     keydir: "/Users/jpeck/keys/"
   }
-  console.log(stime(undefined, logName), "begin", `${host}${svropts.domain}:${svropts.port}`, process.pid)
+  return svropts
+}
+/** return {cnlx, cnxlp, host, port, pid, srvropts} */
+export function wssServer(listenp: boolean | EzPromise<WssListener>, logName: string, srvropts: WSSOpts, ...drivers: WSDriver[]) {
+  //const srvropts: WSSOpts = srvrOpts(defHost, defPort)
+  const host = srvropts.host, port = srvropts.port
+  console.log(stime(undefined, logName), "begin", `${host}${srvropts.domain}:${srvropts.port}`, process.pid)
   // WssListener injects its own SSD<ws$WebSocket> at the bottom of the stack
-  const cnxl = new WssListener(host, svropts, ...drivers)
-  if (cnxlp !== false) startListening(cnxl, logName, cnxlp == true ? undefined : cnxlp)
-  return { cnxl, cnxlp: typeof cnxlp == 'boolean' ? undefined : cnxlp , host, port, pid: process.pid, svropts }
+  const cnxl = new WssListener(host, srvropts, ...drivers)
+  if (listenp !== false) startListening(cnxl, logName, listenp == true ? undefined : listenp)
+  return { cnxl, cnxlp: typeof listenp == 'boolean' ? undefined : listenp, host, port, pid: process.pid, srvropts: srvropts }
 }
 /** startListening */
 export function startListening(cnxl: WssListener, logName: string, cnxlp = new EzPromise<WssListener>()): EzPromise<WssListener> {

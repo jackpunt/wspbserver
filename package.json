@@ -9,7 +9,7 @@
   "scripts": {
     "pub": "npm run build; npm version ${1:-patch}; npm publish --access public",
     "echo": "node dist/echoserver.js",
-    "cgserver": "node dist/cg-server.js",
+    "cgserver": "node dist/cgserver.js", "Note0": "npm run cgserver -- --host game6 --port 8445",
     "testns": "jest --runInBand --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
     "testwss": "jest --runInBand  --detectOpenHandles --verbose -t 'wss:'",
     "test": "jest --runInBand  --detectOpenHandles --verbose spec.ts",
@@ -49,8 +49,9 @@
     "@types/node": "*",
     "@types/ws": "^7.4.1",
     "chrome-launcher": "^0.13.4",
-    "@types/jest": "^27.3.1",
-    "jest": "^27.3.1",
-    "ts-jest": "^27.0.7"
-  }
+    "@types/jest": "^26.0.22",
+    "jest": "^26.6.3",
+    "ts-jest": "^26.5.4",
+    "typescript": "~4.5.2",
+    "ws": "^7.4.5"  }
 }
