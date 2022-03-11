@@ -1,9 +1,9 @@
 import { WebSocketBase, CgMessage, CgType, AckPromise } from '@thegraid/wspbclient'
 import type { CgClient } from '@thegraid/wspbclient'
-import { DataBuf, stime, EzPromise, pbMessage, CLOSE_CODE, AWebSocket, readyState} from '@thegraid/wspbclient'
-import { wsWebSocket, ws } from './wsWebSocket'
+import { stime, EzPromise, pbMessage, CLOSE_CODE, AWebSocket, readyState} from '@thegraid/wspbclient'
+import { wsWebSocket } from '@thegraid/wspbclient'
 import { buildURL } from '@thegraid/common-lib'
-import { TestCgClient, TestCgClientR, wsCgWebSocketBase, wsWebSocketBase } from './wsWebSocketBase'
+import { TestCgClient, TestCgClientR, wsCgWebSocketBase, wsWebSocketBase } from '@thegraid/wspbclient'
 import { srvrOpts } from '../src/wssServer'
 
 var testTimeout = 3000;

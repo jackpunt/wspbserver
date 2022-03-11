@@ -1,3 +1,3 @@
-import { CgServerDriver, wssServer } from '.';
+import { CgServerDriver, srvrOpts, wssServer } from '.';
 
-wssServer(true, 'cgserver', 'game7', '8444', CgServerDriver)
+wssServer(true, 'cgserver', srvrOpts('game7', '8444'), CgServerDriver)

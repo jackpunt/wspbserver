@@ -39,15 +39,15 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 		return super.connectStream(ws as AWebSocket | string, ...drivers)
 	}
 	wsopen(ev: ws$WebSocket.OpenEvent) {
-		console.log(stime(), "SSD: open", ev)
+		this.log && console.log(stime(), "SSD: open", ev)
 	}
-	/** default listener, ok to override. */
+	/** default listener just logs event; ok to override. */
 	wsclose(ev: ws$WebSocket.CloseEvent) {
 		let { target, wasClean, reason, code } = ev
-		console.log(stime(), "SSD: close", {code, reason, wasClean})
+		this.log && console.log(stime(), "SSD: close", {code, reason, wasClean})
 	}
 	wserror(ev: ws$WebSocket.ErrorEvent) {
-		console.log(stime(), "SSD: error", ev)
+		this.log && console.log(stime(), "SSD: error", ev)
 	}
 	/**
 	 * send data to upstream.wsmessage(data)
@@ -55,10 +55,10 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 	 * @override to remove logging
 	 */
   wsmessage(data: DataBuf<T>): void {
-    // console.log(stime(), "BaseDriver.wsmessage: upstream.wsmessage(data)", this.upstream)
+    // this.log && console.log(stime(), "BaseDriver.wsmessage: upstream.wsmessage(data)", this.upstream)
     if (!!this.upstream) this.upstream.wsmessage(data)
   };
-	connectWebSocket(wss: ws$WebSocket | WebSocket | string) {
+	connectWebSocket(wss: ws$WebSocket | WebSocket | string): this {
 		// use alternate server-side Events and handlers:
 		if (wss instanceof ws$WebSocket) {
 			this.wss = wss
@@ -69,6 +69,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 			// BaseDriver.onmessage(ev) -> this.wsmessage(ev.data) [works for DOM & Node onmessage(ev)]
 			wss.onmessage = (ev: ws$WebSocket.MessageEvent) => this.wsmessage(ev.data as Buffer)
 		} else { super.connectWebSocket(wss) }
+    return this
 	}
 	/**
 	 *

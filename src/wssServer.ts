@@ -1,25 +1,18 @@
+import { argVal } from '@thegraid/common-lib'
 import { WSSOpts, WssListener, WSDriver } from '.';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
-/** get from common-lib */
-export function argVal(name: string, defVal: string, k: string = '--'): string {
-  const envVal = process.env[name] || defVal
-  const argKey = (k == '=') ? `${name}${k}` : `${k}${name}`
-  const argVal = process.argv.find((val, ndx, ary) => (ndx > 0 && ary[ndx - 1] == argKey)) || envVal
-  return argVal
-}
 export function srvrOpts(defHost = 'game7', defPort = '8443', k: string = '--'): WSSOpts {
-  const host = argVal('host', defHost)
-  const portStr = argVal('port', defPort)
+  const host = argVal('host', defHost, k)
+  const portStr = argVal('port', defPort, k)
   const port = Number.parseInt(portStr)
 
-  const svropts: WSSOpts = {
+  return {
     host: host,
     domain: "thegraid.com",
     port: port,
     keydir: "/Users/jpeck/keys/"
   }
-  return svropts
 }
 /** return {cnlx, cnxlp, host, port, pid, srvropts} */
 export function wssServer(listenp: boolean | EzPromise<WssListener>, logName: string, srvropts: WSSOpts, ...drivers: WSDriver[]) {
