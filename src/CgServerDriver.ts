@@ -5,28 +5,28 @@ import type { Remote } from "./wspbserver";
 
 //type ClientGroup2 = Record<string, ServerSocketDriver<pbMessage>> ;
 type Member = [ client_id: number, remote: Remote ]
-class ClientGroup { // TODO: use Map<number,CgServerDriver>
+class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,CgServerDriver>
   /** the join_name of this ClientGroup */
   aname: string;
-  memmap: Map<number, CgServerDriver> = new Map()
-  get length() { return this.memmap.size; }
+  //memmap: Map<number, CgServerDriver> = new Map()
+  get length() { return this.size; }
   // ASSERT referee is *always* in slot 0
-  get referee() { return this.memmap.get(0)}
-  set referee(driver) { this.memmap.set(0, driver)}
+  get referee() { return this.get(0)}
+  set referee(driver) { this.set(0, driver)}
   /** itemize the group membership. originally just for logging join/leave */
   get members() {
     let rv: Member[] = []
-    this.memmap.forEach((driver: CgServerDriver, id: number) => { rv.push([id, driver.remote] as Member) })
+    this.forEach((driver: CgServerDriver, id: number) => { rv.push([id, driver.remote] as Member) })
     return rv;
   }
   forEachMember(fn: (driver: CgServerDriver, id:number) => void) {
-    this.memmap.forEach(fn);
+    this.forEach(fn);
   }
   getMember(client_id: number) {
-    return this.memmap.get(client_id)
+    return this.get(client_id)
   }
   memberId(driver: CgServerDriver) {
-    for (let value of this.memmap.entries()) { if (value[1] === driver) return value[0] }
+    for (let value of this.entries()) { if (value[1] === driver) return value[0] }
     return -1
   }
 
@@ -34,13 +34,13 @@ class ClientGroup { // TODO: use Map<number,CgServerDriver>
   addMember(member: CgServerDriver) { 
     for (let id = 1; ; id++) {
       if (!this.getMember(id)) {
-        this.memmap.set(id, member)
+        this.set(id, member)
         return id; // lowest unused client_id
       } 
     }
   }
   removeMember(id: number) {
-    this.memmap.delete(id)
+    this.delete(id)
   }
 }
 
