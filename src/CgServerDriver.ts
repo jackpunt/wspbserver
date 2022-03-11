@@ -8,7 +8,6 @@ type Member = [ client_id: number, remote: Remote ]
 class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,CgServerDriver>
   /** the join_name of this ClientGroup */
   aname: string;
-  //memmap: Map<number, CgServerDriver> = new Map()
   get length() { return this.size; }
   // ASSERT referee is *always* in slot 0
   get referee() { return this.get(0)}
