@@ -2,16 +2,35 @@ import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, pbMes
 import { ServerSocketDriver } from "./ServerSocketDriver";
 import type * as ws$WebSocket from "ws";
 import type { Remote } from "./wspbserver";
+import { execSync } from "child_process";
 
+function listTCPsockets(pid = `${process.pid}`) {
+  let lsofTCP = execSync(`(lsof -P -i TCP -a -p ${pid}; cat)`, {stdio: ['ignore', 'pipe', 'ignore']} ).toString()
+  let lines = lsofTCP.split('\n')
+  let openSockets = lines.slice(1, -1)
+  console.log(stime('CgServerDriver', `.listTCPsockets(${pid}): ${openSockets.length} sockets`), openSockets)
+  return openSockets
+}
 //type ClientGroup2 = Record<string, ServerSocketDriver<pbMessage>> ;
 type Member = [ client_id: number, remote: Remote ]
 class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,CgServerDriver>
   /** the join_name of this ClientGroup */
-  aname: string;
+  name: string;
+  constructor(name: string) {
+    super()
+    this.name = name
+  }
   get length() { return this.size; }
   // ASSERT referee is *always* in slot 0
   get referee() { return this.get(0)}
-  set referee(driver) { this.set(0, driver)}
+  set referee(member) { this.set(0, member) }
+  override set (id: number, member: CgServerDriver): this {
+    super.set(id, member)
+    member.client_id = id
+    member.group = this
+    member.group_name = this.name // in case of debug mostly.
+    return this
+  }
   /** itemize the group membership. originally just for logging join/leave */
   get members() {
     let rv: Member[] = []
@@ -26,9 +45,8 @@ class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,
   }
   memberId(driver: CgServerDriver) {
     for (let value of this.entries()) { if (value[1] === driver) return value[0] }
-    return -1
+    return undefined
   }
-
   /** find lowest client_id not currently in use. */
   addMember(member: CgServerDriver) { 
     for (let id = 1; ; id++) {
@@ -39,7 +57,11 @@ class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,
     }
   }
   removeMember(id: number) {
+    let member = this.getMember(id)
     this.delete(id)
+    member.client_id = undefined  // this client no longer a member of any group
+    member.group = undefined
+    member.group_name = undefined
   }
 }
 
@@ -49,20 +71,20 @@ class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,
  * ASSERT: is running on Node, and this.dnstream ISA ServerSocketDriver with ws$WebSocket
  */
 export class CgServerDriver extends CgBase<CgMessage> {
-  static groups: Record<string, ClientGroup> = {} // Map(group-name:string => CgMessageHanlder[])
-  constructor() { super(); this.log = true }
-
-  group_name: string;  // group to which this connection is join'd
+  static cGroups: Map<string, ClientGroup> = new Map()
+  constructor() { 
+    super(); 
+    this.log = true 
+    this.log && listTCPsockets()
+  }
 
   /** identify port before joined. 
    * @override client-only version in CgBase
    */
   get client_port() { return this.client_id !== undefined ? this.client_id : `${this.remote.addr}:${this.remote.port}`}
 
-  /** the extant ClientGroup matching this.group_name. */
-  get group() { return CgServerDriver.groups[this.group_name] }
-
-    //return [1,2,3,4,5].find(id => group.find(c => c.client_id === id) === undefined)
+  /** the extant ClientGroup matching CgBase.group_name. */
+  group: ClientGroup;
 
   /** pluck Remote info from ServerSocketBase of this stream. */
   get remote(): Remote { 
@@ -80,15 +102,15 @@ export class CgServerDriver extends CgBase<CgMessage> {
       // dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
       dnstream.wsclose = (ev: ws$WebSocket.CloseEvent) => {
         let { target, wasClean, reason, code } = ev
-        let ndx = this.group && this.group.memberId(this) // verify [this, client_id] is [still] in group
-        this.log && console.log(stime(this.dnstream, `.wsclose`), `[${this.client_id}]`, { code, reason, wasClean, ndx})
-        if (ndx >= 0) {
-          this.client_id = ndx // ensure client_id is matching group index
-          let type = CgType.leave, client_id = this.client_id, cause = "closed", nocc = true, group = this.group.aname
+        let client_id = this.group && this.group.memberId(this) // verify [this, client_id] is [still] in group
+        this.log && console.log(stime(this.dnstream, `.wsclose`), `[${this.client_id}]`, { code, reason, wasClean, ndx: client_id})
+        if (client_id >= 0) {
+          let type = CgType.leave, cause = "closed", nocc = true, group = this.group.name
           let message = this.makeCgMessage({ type, client_id, cause, group, nocc })
           this.removeFromGroup()            // remove this client-cnx from group
           this.sendToMembers(message, true) // tell others this client has gone (ignore acks)
         }
+        this.log && listTCPsockets()
       }
     }
     return this
@@ -120,9 +142,9 @@ export class CgServerDriver extends CgBase<CgMessage> {
    */
   parseEval(message: CgMessage): void {
     message.client_from = this.client_id      // ensure every message thru CgServer is augmented with client_from
-    if (message.type != CgType.join && this.client_id === undefined) {
-      this.log && console.log(stime(this, `.parseEval[${this.client_id}] <-`), this.innerMessageString(message), "nak & ignore message from non-member")
-      this.sendNak("not a member", { group: this.group_name })
+    if (message.type !== CgType.join && this.client_id === undefined) {
+      this.log && console.log(stime(this, `.parseEval[-] <-`), this.innerMessageString(message), "nak & ignore message from non-member")
+      this.sendNak("not a member")
       return
     }
     if (!this.ack_resolved && message.type != CgType.ack) {
@@ -154,22 +176,20 @@ export class CgServerDriver extends CgBase<CgMessage> {
    * QQQQ: should 'join' requests be moderated by client_0 ? (to verify passcode or whatever)
    */
   eval_join(message: CgMessage): void {
-    if (this.group_name !== undefined) {
+    if (this.group !== undefined) {
       // Maybe someday support an array of group names... ? to multiplex the client-server cnx
-      // but then each message will need an associated group_name/group_id (default to last used?)
-      this.sendNak("already in group", {group: this.group_name })
+      // No: demux at a higher level
+      this.sendNak("already in group", { group: this.group.name })
       return
     }
-    let join_name = message.group
-    this.group_name = join_name     // this.group = group
-    let group = this.group
+    const join_name = message.group
+    let group = CgServerDriver.cGroups.get(join_name)
     if (!group) {
       // create/register the group, recruit a Referee:
-      group = new ClientGroup();
-      group.aname = join_name;      // for ease of debug reference
-      this.log && console.log(stime(), "CgServerDriver.eval_join: new Group", group)
-      CgServerDriver.groups[join_name] = group // add new group by name
+      group = new ClientGroup(join_name)
+      CgServerDriver.cGroups.set(join_name, group)
       new CgAutoAckDriver(this.ref_join_message(join_name)) // TODO: spawn a referee, let it connect
+      this.log && console.log(stime(this, '.eval_join:'), `new Group(${group.name})`, group.members)
     }
     let isAutoAck = (group.referee instanceof CgAutoAckDriver)
     if (this.isRefereeJoin(message)) { 
@@ -177,42 +197,44 @@ export class CgServerDriver extends CgBase<CgMessage> {
        this.sendNak('referee exists', {group: join_name})
        return
       } 
-      this.client_id = 0
       group.referee = this  // replace CgAutAckDriver with real referee
     } else { 
-      this.client_id = this.group.addMember(this)
+      group.addMember(this)
     }
     let cause = isAutoAck ? "auto-approve" : "ref-approved"
-    this.log && console.log(stime(this, ".eval_join group="), this.group.members, this.remote)
+    this.log && console.log(stime(this, ".eval_join group="), group.members, this.remote)
     this.sendAck(cause, { client_id: this.client_id, group: join_name })
     return
   }
 
   /** when client leaves group: remove CgSrvDrv from the group array. */
   removeFromGroup() {
-    this.log && console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
-    this.group.removeMember(this.client_id)
-    this.log && console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
+    let client_id = this.client_id, group = this.group, group_name = group.name
+    this.log && console.log(stime(this, `.removeFromGroup:A c_id = ${client_id}`), group.members)
+    group.removeMember(client_id)
+    this.log && console.log(stime(this, `.removeFromGroup:B c_id = ${client_id}`), group.members)
 
-    if (this.group.length > 0 && this.client_id === 0) {
+    if (group.length > 0 && client_id === 0) {
       // ref has disconnected! Replace with auto-ack:
-      new CgAutoAckDriver(this.ref_join_message(this.group.aname))
+      new CgAutoAckDriver(this.ref_join_message(group.name))
     }
 
-    if (this.group.length === 1 && this.group.referee instanceof CgServerDriver) {
+    if (group.length === 1 && !!group.referee) {
       // tell the referee to leave: (unless referee indicates this is a perma-group)
-      let ref = this.group.referee
+      let ref = group.referee
       this.log && console.log(stime(this, ".removeFromGroup: group.referee ="), ref.remote)
       let message = this.makeCgMessage({ type: CgType.leave, client_id: 0, cause: "all others gone" })
       let pAck = ref.sendToSocket(message); // eval_leave & send Ack
-      pAck.finally(() => {
-        this.log && console.log(stime(this, ".removeFromGroup: cid="), this.client_id, this.group.members)
+      pAck.then((ackMsg) => {
+        if (ackMsg.success) ref.removeFromGroup()
+      }).finally(() => {
+        this.log && console.log(stime(this, `.removeFromGroup:C c_id = ${client_id}`), group.members)
       })
       return
     }
-    if (this.group.length === 0) {
+    if (group.length === 0) {
       // delete group if nobody is left:
-      delete CgServerDriver.groups[this.group_name]
+      CgServerDriver.cGroups.delete(group_name)
       return
     }
   }
@@ -223,10 +245,10 @@ export class CgServerDriver extends CgBase<CgMessage> {
     // in CgRefClient/CmReferee: edit roster
     // in CgServer[here]: from client seeking to leave, sendToGroup, removeFromGroup; ack
     // in CgServer: also detect dnstream.wsclose and likewise removeFromGroup()
-    let target_id = this.client_id, closeTarget = false
+    let target_id = this.client_id, closeTarget = false, group_name = this.group.name
     message.nocc = true
     let remove_from_group = () => { 
-      this.sendAck(message.cause, { group: this.group_name, client_id: target_id })
+      this.sendAck(message.cause, { group: group_name, client_id: target_id })
       this.removeFromGroup() 
       if (closeTarget) {
         let target = this.group.getMember(target_id);
@@ -315,8 +337,8 @@ export class CgServerDriver extends CgBase<CgMessage> {
     // use auto-ref until there is a better connection.
     let ref = this.group.referee
     if (!(ref instanceof CgServerDriver)) {
-      this.log && console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.group_name)
-      new CgAutoAckDriver(this.ref_join_message(this.group_name)) // failsafe. should not happen
+      this.log && console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.group.name)
+      new CgAutoAckDriver(this.ref_join_message(this.group.name)) // failsafe. should not happen
     }
     this.log && console.log(stime(this, ".sendToReferee ->"), 0, this.innerMessageString(msg))
     return ref.sendToSocket(msg)
@@ -381,6 +403,24 @@ class CgAutoAckDriver extends CgServerDriver {
       this.log && console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote.port})
     }
     rv.fulfill(ack)
+    // as if wsmessage(deserialize(serialize(message))) -> parseEval(message)
+    // "parseEval" if/when referee is being asked to leave the group.
+    if (client_id == this.client_id && message.type === CgType.leave ) {
+      // nextTick... pretend it is delivered
+      setTimeout(() => {
+        //this.parseEval(message)  //this.eval_leave(message)
+      }, 2)
+    }
     return rv
+  }
+  /**
+   * @override
+   */
+  eval_leave(msg: CgMessage) {
+    let { client_id, cause, group } = msg
+    // being told to leave, so group can be reclaimed; or ignore it and stay as Referee
+    if (client_id == 0) {
+      super.eval_leave(this.makeCgMessage({ type: CgType.leave, client_id: 0 }))
+    }
   }
 }

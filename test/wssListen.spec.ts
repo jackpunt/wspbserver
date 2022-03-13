@@ -25,11 +25,11 @@ test("isListening", () => {
     expect(reason.code).toBeNull()
   }).finally(() => {
     cnxl.close((err) => { 
-      console.log(stime(), `WssListener closed`, 'state=', cnxl.state, 'err=', err)
+      console.log(stime('isListening'), `WssListener closed`, 'state=', cnxl.state, 'err=', err)
       closeDone.fulfill()
     })
     // httpsServer & cnxl.wss both have already fired their 'close' callbacks!
-    console.log(stime(), `cnxl.close called: state=`, cnxl.state)
+    console.log(stime('isListening'), `cnxl.close called: state=`, cnxl.state)
   })
 })
 let closeDone = new EzPromise<void>()

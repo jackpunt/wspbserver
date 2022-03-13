@@ -1,8 +1,7 @@
 {
   "extends": "../tsconfig.json",
   "files": [
-    "CgServer.spec.ts",
-    "wssListen.spec.ts"
+   "wssListen.spec.ts"
   ],
   "include": [
     "test/*.ts"

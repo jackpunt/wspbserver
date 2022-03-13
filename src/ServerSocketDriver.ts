@@ -39,15 +39,15 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 		return super.connectStream(ws as AWebSocket | string, ...drivers)
 	}
 	wsopen(ev: ws$WebSocket.OpenEvent) {
-		this.log && console.log(stime(), "SSD: open", ev)
+		this.log && console.log(stime(this, '.wsopen'), "SSD: open", ev)
 	}
 	/** default listener just logs event; ok to override. */
 	wsclose(ev: ws$WebSocket.CloseEvent) {
 		let { target, wasClean, reason, code } = ev
-		this.log && console.log(stime(), "SSD: close", {code, reason, wasClean})
+		this.log && console.log(stime(this, '.wsclose'), "SSD: close", {code, reason, wasClean})
 	}
 	wserror(ev: ws$WebSocket.ErrorEvent) {
-		this.log && console.log(stime(), "SSD: error", ev)
+		this.log && console.log(stime(this, '.wserror'), "SSD: error", ev)
 	}
 	/**
 	 * send data to upstream.wsmessage(data)
