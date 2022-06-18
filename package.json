@@ -1,6 +1,6 @@
 {
   "name": "@thegraid/wspbserver",
-  "version": "1.5.14",
+  "version": "1.5.15",
   "description": "WebSocket Protobuf Server for Client-Group proto",
   "type": "module",
   "main": "dist/index.js",
