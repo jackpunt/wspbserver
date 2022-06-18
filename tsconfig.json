@@ -3,9 +3,11 @@
     "outDir": "dist",
     "lib": ["es2021", "dom"],
     "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "target": "ES2021",
-    "module": "commonjs",
+    "module": "ES2020",
     "importsNotUsedAsValues": "error",
     // https://stackoverflow.com/questions/58384179/syntaxerror-cannot-use-import-statement-outside-a-module
 

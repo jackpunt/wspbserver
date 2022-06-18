@@ -1,18 +1,18 @@
-import * as fs from "fs";
-import * as https from "https";
-import type * as http from "http";
-import * as dns from "dns";
-import * as ws from "ws";
 import { EzPromise } from "@thegraid/EzPromise";
-import { ServerSocketDriver } from "./ServerSocketDriver";
 import { AnyWSD, pbMessage, stime } from "@thegraid/wspbclient";
+import * as dns from "dns";
+import * as fs from "fs";
+import type * as http from "http";
+import * as https from "https";
+import ws, { WebSocketServer } from "ws";
+import { ServerSocketDriver } from "./ServerSocketDriver.js";
 
 /** class/constructor for AnyWSD [a WebSocketDriver for browser or ws/nodejs WebSocket] */
 export type WSDriver = (new () => AnyWSD)
 // Access to ws.WebSocket class! https://github.com/websockets/ws/issues/1517 
-declare module 'ws' {
-  export interface WebSocket extends ws { }
-}
+// declare module 'ws' {
+//   export interface WebSocket extends ws { }
+// }
 
 // node_modules/ws/lib/constants: BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
 export type BINARY_TYPES = 'nodebuffer' | 'arraybuffer' | 'fragments';
@@ -35,7 +35,7 @@ export type Remote = {addr: string, port: number, family: string}
 /** Reminder of options that 'ws' makes available, 
  * WssListener default sets binaryType: 'arraybuffer' 
  */
-export interface WsServerOptions extends ws.ServerOptions {
+export interface WsServerOptions extends http.ServerOptions {
 	host?: string, port?: number, 
 	backlog?: number,
 	server?: http.Server | https.Server, 
@@ -127,7 +127,7 @@ export class WssListener {
 	}
 
 	makeWsServer(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
-    return new ws.Server(Object.assign({ server: httpsServer }, opts));
+    return new WebSocketServer(Object.assign({ server: httpsServer }, opts));
 	}
 
 	/**

@@ -1,7 +1,7 @@
 import { className, EzPromise, stime } from "@thegraid/wspbclient";
 import { Server as HttpsServer } from "https";
 //import { CLOSING, CLOSED } from "ws";
-import { CgServerDriver, srvrOpts, startListening, WssListener, wssServer } from "../src";
+import { CgServerDriver, srvrOpts, startListening, WssListener, wssServer } from "../src/index.js";
 
 // jest will NOT pass useful args to test file
 let srvropts = srvrOpts('game6', '8443', '=')

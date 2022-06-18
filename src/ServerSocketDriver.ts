@@ -1,6 +1,6 @@
-import * as ws$WebSocket from "ws";
-import { DataBuf, pbMessage, WebSocketBase, stime, AWebSocket, AnyWSD, UpstreamDrivable, CLOSE_CODE } from "@thegraid/wspbclient";
-import type { Remote } from "./wspbserver";
+import { AnyWSD, AWebSocket, CLOSE_CODE, DataBuf, pbMessage, stime, UpstreamDrivable, WebSocketBase } from "@thegraid/wspbclient";
+import ws$WebSocket from "ws";
+import type { Remote } from "./wspbserver.js";
 
 // type SSD<T extends pbMessage> = ServerSocketDriver<T>
 /**
@@ -38,7 +38,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 		// 	this.wss = ws                  // but it simplifies CgServerDriver to set this early
 		return super.connectStream(ws as AWebSocket | string, ...drivers)
 	}
-	wsopen(ev: ws$WebSocket.OpenEvent) {
+	wsopen(ev: ws$WebSocket.Event) {
 		this.log && console.log(stime(this, '.wsopen'), "SSD: open", ev)
 	}
 	/** default listener just logs event; ok to override. */
@@ -63,7 +63,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 		if (wss instanceof ws$WebSocket) {
 			this.wss = wss
 			// TODO: something useful with this.{onopen, onclose, onerror} or this.wss.{onopen, onclose, onerror}
-			wss.onopen = (ev: ws$WebSocket.OpenEvent) => this.wsopen(ev)
+			wss.onopen = (ev: ws$WebSocket.Event) => this.wsopen(ev)
 			wss.onclose = (ev: ws$WebSocket.CloseEvent) => this.wsclose(ev)
 			wss.onerror = (ev: ws$WebSocket.ErrorEvent) => this.wserror(ev)
 			// BaseDriver.onmessage(ev) -> this.wsmessage(ev.data) [works for DOM & Node onmessage(ev)]

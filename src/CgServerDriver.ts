@@ -1,8 +1,8 @@
-import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, pbMessage, stime, UpstreamDrivable } from "@thegraid/wspbclient";
-import { ServerSocketDriver } from "./ServerSocketDriver";
-import type * as ws$WebSocket from "ws";
-import type { Remote } from "./wspbserver";
+import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, stime, UpstreamDrivable } from "@thegraid/wspbclient";
 import { execSync } from "child_process";
+import type ws from "ws";
+import { ServerSocketDriver } from "./ServerSocketDriver.js";
+import type { Remote } from "./wspbserver.js";
 
 function listTCPsockets(pid = `${process.pid}`) {
   let lsofTCP = execSync(`(lsof -P -i TCP -a -p ${pid}; cat)`, {stdio: ['ignore', 'pipe', 'ignore']} ).toString()
@@ -100,7 +100,7 @@ export class CgServerDriver extends CgBase<CgMessage> {
 			// dnstream.wsopen = (ev: ws$WebSocket.OpenEvent) => {}    // super() -> log
 			// dnstream.wserror = (ev: ws$WebSocket.ErrorEvent) => {}  // super() -> log
       // dnstream.wsmessage = (ev: ws$WebSocket.MessageEvent) => { this.wsmessage(ev.data as Buffer)}
-      dnstream.wsclose = (ev: ws$WebSocket.CloseEvent) => {
+      dnstream.wsclose = (ev: ws.CloseEvent) => {
         let { target, wasClean, reason, code } = ev
         let client_id = this.group && this.group.memberId(this) // verify [this, client_id] is [still] in group
         this.log && console.log(stime(this.dnstream, `.wsclose`), `[${this.client_id}]`, { code, reason, wasClean, ndx: client_id})
