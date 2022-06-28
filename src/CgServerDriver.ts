@@ -65,67 +65,6 @@ class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,
     member.group = undefined
     member.group_name = undefined
   }
-  sendToGroup(from: CgServerDriver, message: CgMessage, on_ack?: (pa: CgMessage[]) => void, on_rej?: (pa: CgMessage[]) => void, on_fin?: () => void) {
-    // on_ack & on_rej 'default' to: idenity(val) => val
-    // first send to referee,
-    // if ack-success, then send to rest of group
-    // if ack-fail, then sendNak(ack.cause)
-    // if fail-to-send or fail-to-ack, then sendNak("app failure")
-    let sendToOthers = (message: CgMessage) => {
-        // forward original message to all/rest of group
-        let promises = this.sendToMembers(from, message)
-        let alldone = Promise.all(promises)
-        alldone.then(on_ack, on_rej)
-        alldone.finally(on_fin) // ignore any throw()
-        // this.handlePromiseAll(alldone, on_ack, on_rej, null, on_fin)
-    }
-    if (from.isReferee) {
-      sendToOthers(message) // referee sending a broadcast
-    } else {
-      this.sendToReferee(from, message).then((ack) => {
-        if (ack.success) {
-          sendToOthers(this.refMessage(message, ack))
-        } else {
-          from.sendNak(ack.cause, ack)  // "illegal move"
-        }
-      }, (reason) => {
-        from.sendNak(reason) // "network or application failed"
-      })
-    }
-  }
-  /** For CgType.send, Referee can supply a [CgType.send] message to be sent by including in Ack. */
-  refMessage(orig: CgMessage, ack: CgMessage): CgMessage {
-    let msg = (ack.msg !== undefined) ? CgMessage.deserialize(ack.msg) : orig
-    this.referee?.log && console.log(stime(this, `.refMessage`), msg.outObject())
-    return msg
-  }
-
-  sendToReferee(from: CgServerDriver, msg: CgMessage) {
-    // use auto-ref until there is a better connection.
-    let ref = this.referee
-    if (!(ref instanceof CgServerDriver)) {
-      from.log && console.log(stime(this, ".sendToReferee: recruit new ref for group"), this.name)
-      new CgAutoAckDriver(from.ref_join_message(this.name)) // failsafe. should not happen
-    }
-    from.log && console.log(stime(this, ".sendToReferee ->"), 0, from.innerMessageString(msg))
-    return ref.sendToSocket(msg)
-  }
-
-  /** forward ack'd message to all of group. including the sender (unless nocc: true). */
-  sendToMembers(from: CgServerDriver, message: CgMessage, andRef: boolean = false): Array<AckPromise> {
-    // forward original message to all/other members of group
-    let cc_sender = !message.nocc, n0 = (andRef || (from.isReferee && message.nocc === false)) ? 0 : 1
-    let promises = Array<AckPromise>();
-    this.forEachMember((member, ndx) => {
-      if (ndx >= n0 && (cc_sender || (member !== from))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
-        let msgStr = from.innerMessageString(message), member_id = member.client_id
-        from.log && console.log(stime(this, `.sendToMembers[${from.client_id}] ->`), { member_id, msgStr })
-        promises.push(member.sendToSocket(message))
-      }
-    })
-    //promises[0].fulfill(undefined) // ensure there is  1 Promise filled, is if !message.ackExpected
-    return promises
-  }
 }
 
 /** CgServerDriver: Server-side Client-Group protocol handler 
