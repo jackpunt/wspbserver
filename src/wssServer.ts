@@ -18,7 +18,7 @@ export function srvrOpts(defHost = 'game7', defPort = '8447', k: string = '--'):
 export function wssServer(listenp: boolean | EzPromise<WssListener>, logName: string, srvropts: WSSOpts, ...drivers: WSDriver[]) {
   //const srvropts: WSSOpts = srvrOpts(defHost, defPort)
   const host = srvropts.host, port = srvropts.port
-  console.log(stime('wssServer.', logName), "begin", `${host}.${srvropts.domain}:${srvropts.port}`, process.pid)
+  console.log(stime('wssServer.', logName), "--begin--", `${host}.${srvropts.domain}:${srvropts.port} -> pid=${process.pid}`)
   // WssListener injects its own SSD<ws$WebSocket> at the bottom of the stack
   const cnxl = new WssListener(host, srvropts, ...drivers)
   let cnxlp: EzPromise<WssListener>
@@ -29,9 +29,10 @@ export function wssServer(listenp: boolean | EzPromise<WssListener>, logName: st
 export function startListening(cnxl: WssListener, logName: string, cnxlp = new EzPromise<WssListener>()): EzPromise<WssListener> {
   cnxl.startListening(cnxlp)
   cnxlp.then((cnxl) => {
-    console.log(stime('wssServer.', logName), `listening ${cnxl.hostname}:${cnxl.port}`, process.pid)
+    console.log(stime('wssServer.', logName), `listening ${cnxl.hostname}:${cnxl.port} -> pid=${process.pid}`)
   }, (reason) => {
-    console.log(stime('wssServer.', logName), "reject:", reason.toString())
+    console.error(stime('wssServer.', logName), `reject: ${reason}`) // exit(1) before getting here!
+    process.exit(1)
   })
   return cnxlp
 }

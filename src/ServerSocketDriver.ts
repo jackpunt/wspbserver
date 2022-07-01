@@ -1,16 +1,17 @@
-import { AnyWSD, AWebSocket, CLOSE_CODE, DataBuf, pbMessage, stime, UpstreamDrivable, WebSocketBase } from "@thegraid/wspbclient";
-import ws$WebSocket from "ws";
+import { AnyWSD, AWebSocket, className, CLOSE_CODE, DataBuf, pbMessage, stime, UpstreamDrivable, WebSocketBase } from "@thegraid/wspbclient";
+import ws, { WebSocket as ws$WebSocket} from "ws";
 import type { Remote } from "./wspbserver.js";
 
-// type SSD<T extends pbMessage> = ServerSocketDriver<T>
+// type SSD<I extends pbMessage> = ServerSocketDriver<I>
 /**
  * Special WebSocketDriver that works on Node server, using ws$WebSocket.
  * 
  */
-export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T> {
+export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I> {
+  static logLevel = 1
 	/** The underlying WebSocket to send/receive bytes. */
-	wss: ws$WebSocket; // set by connectWebSocket
-	remote: Remote;
+	wss: ws; // set by connectWebSocket
+	remote: Remote; // provided by [wspbserver] WssListener.onConnection()
 
 	// TODO: resolve how to manage "client_id" as a string/key into ClientGroup: Record<string, SSD>
 	/**
@@ -20,54 +21,76 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 	constructor(remote: Remote) {
 		super()
 		this.remote = remote
+    this.log = ServerSocketDriver.logLevel
 	}
 
-	/** set and used for onerror, by/during sendBuffer */
-	sendSendError: (error: Event) => void;
-
-	connectDnStream(ws_or_url: ws$WebSocket | AWebSocket | string | UpstreamDrivable<T>): this {
-		if (ws_or_url instanceof ws$WebSocket) {
+	override connectDnStream(ws_or_url: ws | AWebSocket | string | UpstreamDrivable<I>): this {
+		if (ws_or_url instanceof ws) {
 		  this.connectWebSocket(ws_or_url)
 			return this
 		} else {
 			return super.connectDnStream(ws_or_url)
 		}
 	}
-	connectStream(ws: ws$WebSocket | AWebSocket | string, ...drivers: Array<{ new(): AnyWSD }>): AnyWSD[] {
-		// if (ws instanceof ws$WebSocket)  // eventually WebSocketDriver.connectWebSocket() would do this
-		// 	this.wss = ws                  // but it simplifies CgServerDriver to set this early
-		return super.connectStream(ws as AWebSocket | string, ...drivers)
+  /** handle an inbound ws: stack it with the given Drivers  
+   * @param ws an open/inbound ws$WebSocket from WssListener
+   */
+	override connectStream(ws: ws | AWebSocket | string, ...drivers: Array<{ new(): AnyWSD }>): AnyWSD[] {
+    // ASSERT: ws is an open/connected ws.WebSocket.
+    // set this.wss = ws so CgServerDriver can addEventListener('close')
+    // eventually WebSocketDriver.connectWebSocket() will [also] set it
+		if (ws instanceof ws$WebSocket) this.wss = ws   
+    this.ll(2) && console.log(stime(this, `.connectStream:`), ServerSocketDriver, ...drivers)
+		return super.connectStream(ws as AWebSocket, ...drivers)
 	}
-	wsopen(ev: ws$WebSocket.Event) {
-		this.log && console.log(stime(this, '.wsopen'), "SSD: open", ev)
+  // create DOM Event, invoke BaseDriver.listener(type, evt) === this.ontype(evt)
+  // BaseDriver.ontype(evt) will likely BaseDriver.dispatchEvent(evt)
+	wsopen(wsevt: ws.Event) {
+    let { type, target } = wsevt
+    //let evt = new Event('open', {}) // TODO: set other properties as needed.
+    let evt = { type } as Event
+		this.ll(1) && console.log(stime(this, '.wsopen'), "SSD: open", evt)
+    if (!target) return
+    this.onopen(evt) // propagate 'sideways'; onopen() will propagate 'up'
 	}
-	/** default listener just logs event; ok to override. */
-	wsclose(ev: ws$WebSocket.CloseEvent) {
-		let { target, wasClean, reason, code } = ev
-		this.log && console.log(stime(this, '.wsclose'), "SSD: close", {code, reason, wasClean})
+	/** default listener just logs event; ok to override: overwritten by CgServerDriver! */
+  wsclose(wsevt: ws.CloseEvent) {
+    let { type, code, reason, wasClean } = wsevt
+    // If we had the DOM-library, with new CloseEvent(), it would be easy:
+    //let evt = new CloseEvent('close', {code, reason, wasClean})
+    let evt = { type, code, reason, wasClean} as CloseEvent
+		this.ll(1) && console.log(stime(this, '.wsclose'), "SSD: close", evt)
+    this.onclose(evt)
 	}
-	wserror(ev: ws$WebSocket.ErrorEvent) {
-		this.log && console.log(stime(this, '.wserror'), "SSD: error", ev)
+	wserror(wsevt: ws.ErrorEvent) {
+    let { type, error, message } = wsevt
+    // let evt = new ErrorEvent('error', { error, message })
+    let evt = { type, error, message } as ErrorEvent
+		this.ll(1) && console.log(stime(this, '.wserror'), "SSD: error", evt)
+    this.onerror(evt)
 	}
 	/**
-	 * send data to upstream.wsmessage(data)
+	 * Handle MessageData for this driver [nothing];
+   * 
+   * Note: MessageEvent(data) -> listeners('message')
 	 * @param data 
 	 * @override to remove logging
 	 */
-  wsmessage(data: DataBuf<T>): void {
-    // this.log && console.log(stime(), "BaseDriver.wsmessage: upstream.wsmessage(data)", this.upstream)
-    if (!!this.upstream) this.upstream.wsmessage(data)
+  override wsmessage(data: DataBuf<I>): void {
+    this.ll(2) && console.log(stime(this, `.wsmessage:`), `data[${data.length}]`)
+    super.wsmessage(data)
   };
-	connectWebSocket(wss: ws$WebSocket | WebSocket | string): this {
+	override connectWebSocket(wss: ws | WebSocket | string): this {
 		// use alternate server-side Events and handlers:
-		if (wss instanceof ws$WebSocket) {
+		if (wss instanceof ws) {
+      console.log(stime(this, `.connectWebSocket: url =`), wss.url)
 			this.wss = wss
-			// TODO: something useful with this.{onopen, onclose, onerror} or this.wss.{onopen, onclose, onerror}
-			wss.onopen = (ev: ws$WebSocket.Event) => this.wsopen(ev)
-			wss.onclose = (ev: ws$WebSocket.CloseEvent) => this.wsclose(ev)
-			wss.onerror = (ev: ws$WebSocket.ErrorEvent) => this.wserror(ev)
-			// BaseDriver.onmessage(ev) -> this.wsmessage(ev.data) [works for DOM & Node onmessage(ev)]
-			wss.onmessage = (ev: ws$WebSocket.MessageEvent) => this.wsmessage(ev.data as Buffer)
+      wss.addEventListener('open', (ev: ws.Event) => this.wsopen(ev))
+      wss.addEventListener('close', (ev: ws.CloseEvent) => this.wsclose(ev))
+      wss.addEventListener('error', (ev: ws.ErrorEvent) => this.wserror(ev))
+      wss.addEventListener('message', (ev) => { this.onmessage(this.newMessageEvent(ev.data as DataBuf<I>)) })
+      // Note: onmessage will invoke this.wsmessage(data) ---> this.upstream.wsmessage(data)
+      // wss.emit('open', {}) // hmm, maybe wss was *already* open, so we need to kick it again?
 		} else { super.connectWebSocket(wss) }
     return this
 	}
@@ -76,7 +99,7 @@ export class ServerSocketDriver<T extends pbMessage> extends WebSocketBase<T, T>
 	 * @param data DataBuf to be sent
 	 * @param cb provide specific function for 'onerror' [rare]
 	 */
-	sendBuffer(data: DataBuf<T>, cb?: (error: Event | Error) => void): void {
+	sendBuffer(data: DataBuf<I>, cb?: (error: Event | Error) => void): void {
 		this.wss.send(data, cb); // server-side API (no 'options', undefined)
 	}
   closeStream(code: CLOSE_CODE, reason: string): void {

@@ -1,11 +1,10 @@
-import { stime } from '@thegraid/common-lib';
-import { EzPromise } from '@thegraid/ezpromise';
-import { CgServerDriver, srvrOpts, WssListener, wssServer } from './index.js';
+import { argVal, stime } from '@thegraid/common-lib';
+import { CgServerDriver, srvrOpts, wssServer } from './index.js';
+import { ServerSocketDriver } from './ServerSocketDriver.js';
 
-let cnxlp = new EzPromise<WssListener>(), logName = 'cgserver', ln = process.argv[0]
-cnxlp.then(() => { }, (reason) => {
-  console.error(stime('wssServer.', logName), `exit(1) ${process.pid} -- ${reason}`)
-  process.exit(1)
-})
+let lld0 = Number.parseInt(argVal('lld0', '1'))
+let lld1 = Number.parseInt(argVal('lld1', '1'))
+ServerSocketDriver.logLevel = lld0
+CgServerDriver.logLevel = lld1
 
-wssServer(cnxlp, 'cgserver', srvrOpts('game7', '8447'), CgServerDriver)
+wssServer(true, 'cgserver', srvrOpts('game7', '8447'), CgServerDriver)

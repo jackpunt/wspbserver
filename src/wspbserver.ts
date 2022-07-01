@@ -92,7 +92,7 @@ export class WssListener {
     this.credentials = this.getCredentials(this.keypath, this.certpath)
 		this.drivers = drivers
 		this.httpsServer = https.createServer(this.credentials, undefined)
-		this.wss = this.makeWsServer(this.httpsServer, this.baseOpts)
+		this.wss = this.newWebSocketServer(this.httpsServer, this.baseOpts)
   }
 	
 	/** 
@@ -126,14 +126,15 @@ export class WssListener {
 		return { key: privateKey, cert: certificate };
 	}
 
-	makeWsServer(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
+  /** new 'ws' WebSocketServer({server, ...opts}) */
+	newWebSocketServer(httpsServer: https.Server, opts: WsServerOptions = this.baseOpts): ws.Server {
     return new WebSocketServer(Object.assign({ server: httpsServer }, opts));
 	}
 
 	/**
 	 * Invoked for each new connection to this server.
 	 * 
-	 * new this.WSB().connectStream(ws, ...this.drivers)
+	 * new this.SSD().connectStream(ws, ...this.drivers)
 	 * 
 	 * @param ws the newly connected ws.WebSocket
 	 * @param request contains info from HTTP 

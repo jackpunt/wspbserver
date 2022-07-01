@@ -7,10 +7,12 @@
     {
       "type": "pwa-node",
       "request": "launch",
-      "name": "cg-server",
-      "program": "dist/cg-server.js",
-      "args": [""],
+      "name": "cgserver",
+      //"outFiles": ["dist"],
+      "program": "${workspaceFolder}/dist/cgserver.js",
+      "args": ["$program", "--host", "game5"],
       "console": "integratedTerminal",
+      // "preLaunchTask": "tsc: build - tsconfig.json",
       "runtimeArgs": ["--preserve-symlinks"], // when symlinked to wspbclient
       "internalConsoleOptions": "neverOpen"
     },
