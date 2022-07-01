@@ -1,6 +1,6 @@
-import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, className, CLOSE_CODE, DataBuf, pbMessage, stime, UpstreamDrivable } from "@thegraid/wspbclient";
+import { json } from "@thegraid/common-lib";
+import { AckPromise, BaseDriver, CgBase, CgMessage, CgMessageOpts, CgType, CLOSE_CODE, DataBuf, pbMessage, stime, UpstreamDrivable } from "@thegraid/wspbclient";
 import { execSync } from "child_process";
-import type ws from "ws";
 import { ServerSocketDriver } from "./ServerSocketDriver.js";
 import type { Remote } from "./wspbserver.js";
 
@@ -11,10 +11,8 @@ function listTCPsockets(pid = `${process.pid}`) {
   console.log(stime('CgServerDriver', `.listTCPsockets(${pid}): ${openSockets.length} sockets`), openSockets)
   return openSockets
 }
-//type ClientGroup2 = Record<string, ServerSocketDriver<pbMessage>> ;
-type Member = [ client_id: number, remote: Remote ]
-/** Map(name, length, referee) from member_id -> MemberCgServerDriver */
-class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,CgServerDriver>
+/** Map(name, length, referee) from member_id -> CgServerDriver */
+class ClientGroup extends Map<number, CgServerDriver> {
   /** the join_name of this ClientGroup */
   name: string;
   constructor(name: string) {
@@ -33,10 +31,10 @@ class ClientGroup extends Map<number, CgServerDriver> { // TODO: use Map<number,
     member.group_name = this.name // in case of debug mostly.
     return this
   }
-  /** itemize the group membership. originally just for logging join/leave */
+  /** itemize the group membership. For logging join/leave */
   get members() {
-    let rv: Member[] = []
-    this.forEach((driver: CgServerDriver, id: number) => { rv.push([id, driver.remote] as Member) })
+    let rv = []  // TODO: get Map.entries().map() to work
+    for (let [id, driver] of this) rv.push([id, driver.remote_addr_port])
     return rv;
   }
   forEachMember(fn: (driver: CgServerDriver, id:number) => void) {
@@ -84,7 +82,7 @@ export class CgServerDriver extends CgBase<pbMessage> {
   /** identify port before joined. 
    * @override client-only version in CgBase
    */
-  get client_port() { return this.client_id !== undefined ? this.client_id : `${this.remote.addr}:${this.remote.port}`}
+  get client_port() { return this.client_id !== undefined ? this.client_id : this.remote_addr_port}
 
   /** the extant ClientGroup matching CgBase.group_name. */
   group: ClientGroup;
@@ -95,7 +93,18 @@ export class CgServerDriver extends CgBase<pbMessage> {
     while ((dnstream instanceof BaseDriver) && !(dnstream instanceof ServerSocketDriver)) { dnstream = dnstream.dnstream }
     return (dnstream as ServerSocketDriver<any>).remote
   }
+  get remote_addr_port() {
+    return `${this.remote.addr}:${this.remote.port}`
+  }
 
+  override logData(data: DataBuf<CgMessage>, wrapper?: pbMessage) {
+    // for server logs: return single-line string when able:
+    let logData = super.logData(data, wrapper) as { msgObj: {} | string, str?: string, imsg?: string | pbMessage }
+    if (Object.keys(logData).length > 1) return logData  // <-- with embedded str&imsg
+    let msgObj = logData.msgObj
+    if (typeof msgObj === 'string') return msgObj // <-- the usual case
+    return json(msgObj)                           // <-- if super uses msg.msgObject(false)
+  }
   connectDnStream(dnstream: UpstreamDrivable<CgMessage>): this {
     super.connectDnStream(dnstream)
     if (dnstream instanceof ServerSocketDriver) {
@@ -190,21 +199,22 @@ export class CgServerDriver extends CgBase<pbMessage> {
       // create/register the group, recruit a Referee:
       group = new ClientGroup(join_name)
       CgServerDriver.cGroups.set(join_name, group)
-      new CgAutoAckDriver(this.ref_join_message(join_name)) // TODO: spawn a referee, let it connect
+      new CgAutoAckDriver(this.ref_join_message(join_name)) // reentrant call to eval_join!
       this.ll(1) && console.log(stime(this, '.eval_join:'), `new Group(${group.name})`, group.members)
     }
-    let isAutoAck = (group.referee instanceof CgAutoAckDriver)
+    let isAutoAck = !group.referee || (group.referee instanceof CgAutoAckDriver)
+    let cause = isAutoAck ? "auto-approve" : "ref-approved"
     if (this.isRefereeJoin(message)) { 
-      if ((group.referee instanceof CgServerDriver) && !isAutoAck) {
+      if (!isAutoAck && (group.referee instanceof CgServerDriver)) {
        this.sendNak('referee exists', {group: join_name}) // TODO: send refJoin msg to existing Ref to handle
        return
       } 
-      group.referee = this  // replace CgAutAckDriver with [CgServerDriver connected to] real referee
+      cause = 'new-referee'
+      group.referee = this  // replace CgAutoAckDriver with [CgServerDriver connected to] real referee
     } else { 
       group.addMember(this) // this.group=group
     }
-    let cause = isAutoAck ? "auto-approve" : "ref-approved"
-    this.ll(1) && console.log(stime(this, ".eval_join"), {group: group.members, remote: this.remote})
+    this.ll(1) && console.log(stime(this, ".eval_join"), {group: group.members, remote: this.remote_addr_port})
     this.sendAck(cause, { client_id: this.client_id, group: join_name })
     return
   }
@@ -224,7 +234,7 @@ export class CgServerDriver extends CgBase<pbMessage> {
     if (group.length === 1 && !!group.referee) {
       // tell the referee to leave: (unless referee indicates this is a perma-group)
       let ref = group.referee
-      this.ll(1) && console.log(stime(this, `.removeFromGroup:C c_id = ${client_id} ref =`), ref.remote)
+      this.ll(1) && console.log(stime(this, `.removeFromGroup:C c_id = ${client_id} ref =`), ref.remote_addr_port)
       let message = this.makeCgMessage({ type: CgType.leave, client_id: 0, cause: "all others gone" })
       let pAck = ref.sendToSocket(message); // eval_leave & send Ack
       pAck.then((ackMsg) => {
@@ -253,8 +263,8 @@ export class CgServerDriver extends CgBase<pbMessage> {
       this.removeFromGroup() // this.group = undefined
       if (closeTarget) {
         let target = this.group.getMember(target_id);
-        console.log(stime(this, `.eval_leave: target.closeStream`), { port: target.client_port })
-        target.closeStream(1008, 'closed by referee')
+        console.log(stime(this, `.eval_leave: target.closeStream`), { client_id: target.client_port })
+        target.closeStream(CLOSE_CODE.PolicyViolation, 'closed by referee') // # 1008
       }
     }
     if (message.client_from == 0 && message.client_id != 0) {
@@ -381,6 +391,9 @@ export class CgServerDriver extends CgBase<pbMessage> {
 
 /** in-process Referee "connection" that immediately Acks any message that needs it. */
 class CgAutoAckDriver extends CgServerDriver {
+  static port_no = 0
+  /** serial number */
+  port = ++CgAutoAckDriver.port_no
   constructor(ref_join_message: CgMessage) {
     super()
     // ASSERT: this.isFromReferee(join_message)
@@ -389,7 +402,7 @@ class CgAutoAckDriver extends CgServerDriver {
   /** 
    * @override there is no downstream websocket, no remote connnection
    */
-  get remote(): Remote { return { addr: "CgAutoAckDriver", port: 0, family: "" } }
+  get remote(): Remote { return { addr: "CgAutoAckDriver", port: this.port, family: "" } }
   /**
    * @override There is no dnstream Socket; don't 'send' anything.
    * @return a Promise\<Ack> that is resolved (without send/recv/eval)
@@ -401,7 +414,7 @@ class CgAutoAckDriver extends CgServerDriver {
     // msgsToAck: [none, join, leave, send]
     if (message.expectsAck()) {
       ack = this.makeCgMessage({ type: CgType.ack, success: true, cause: "auto-approve", client_id })
-      this.ll(1) && console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, remote: this.remote.port})
+      this.ll(1) && console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, port: this.remote.port})
     }
     rv.fulfill(ack)
     // as if wsmessage(deserialize(serialize(message))) -> parseEval(message)

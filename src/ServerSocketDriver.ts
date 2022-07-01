@@ -23,6 +23,10 @@ export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I>
 		this.remote = remote
     this.log = ServerSocketDriver.logLevel
 	}
+  /** identify port before joined. 
+   * @override client-only version in CgBase
+   */
+   get remote_addr_port() { return `${this.remote.addr}:${this.remote.port}`}
 
 	override connectDnStream(ws_or_url: ws | AWebSocket | string | UpstreamDrivable<I>): this {
 		if (ws_or_url instanceof ws) {
@@ -83,7 +87,7 @@ export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I>
 	override connectWebSocket(wss: ws | WebSocket | string): this {
 		// use alternate server-side Events and handlers:
 		if (wss instanceof ws) {
-      console.log(stime(this, `.connectWebSocket: url =`), wss.url)
+      console.log(stime(this, `.connectWebSocket:`), this.remote_addr_port)
 			this.wss = wss
       wss.addEventListener('open', (ev: ws.Event) => this.wsopen(ev))
       wss.addEventListener('close', (ev: ws.CloseEvent) => this.wsclose(ev))
