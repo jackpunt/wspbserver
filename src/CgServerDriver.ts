@@ -97,9 +97,9 @@ export class CgServerDriver extends CgBase<pbMessage> {
     return `${this.remote.addr}:${this.remote.port}`
   }
 
-  override logData(data: DataBuf<CgMessage>, wrapper?: pbMessage) {
+  override logData(data: DataBuf<CgMessage>) {
     // for server logs: return single-line string when able:
-    let logData = super.logData(data, wrapper) as { msgObj: {} | string, str?: string, imsg?: string | pbMessage }
+    let logData = super.logData(data) as { msgObj: {} | string, str?: string, imsg?: string | pbMessage }
     if (Object.keys(logData).length > 1) return logData  // <-- with embedded str&imsg
     let msgObj = logData.msgObj
     if (typeof msgObj === 'string') return msgObj // <-- the usual case
@@ -417,7 +417,7 @@ class CgAutoAckDriver extends CgServerDriver {
       this.ll(1) && console.log(stime(this, ".sendToSocket ack:"), {cause: ack.cause, port: this.remote.port})
     }
     rv.fulfill(ack)
-    // as if wsmessage(deserialize(serialize(message))) -> parseEval(message)
+    // as if onmessage(deserialize(serialize(message))) -> parseEval(message)
     // "parseEval" if/when referee is being asked to leave the group.
     if (client_id == this.client_id && message.type === CgType.leave ) {
       // nextTick... pretend it is delivered

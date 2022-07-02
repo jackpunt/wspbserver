@@ -80,9 +80,9 @@ export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I>
 	 * @param data 
 	 * @override to remove logging
 	 */
-  override wsmessage(data: DataBuf<I>): void {
-    this.ll(2) && console.log(stime(this, `.wsmessage:`), `data[${data.length}]`)
-    super.wsmessage(data)
+  override onmessage(data: DataBuf<I>): void {
+    this.ll(2) && console.log(stime(this, `.onmessage:`), `data[${data.length}]`)
+    super.onmessage(data)
   };
 	override connectWebSocket(wss: ws | WebSocket | string): this {
 		// use alternate server-side Events and handlers:
@@ -92,7 +92,7 @@ export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I>
       wss.addEventListener('open', (ev: ws.Event) => this.wsopen(ev))
       wss.addEventListener('close', (ev: ws.CloseEvent) => this.wsclose(ev))
       wss.addEventListener('error', (ev: ws.ErrorEvent) => this.wserror(ev))
-      wss.addEventListener('message', (ev) => { this.onmessage(this.newMessageEvent(ev.data as DataBuf<I>)) })
+      wss.addEventListener('message', (ev) => { this.wsmessage(ev.data as DataBuf<I>) })
       // Note: onmessage will invoke this.wsmessage(data) ---> this.upstream.wsmessage(data)
       // wss.emit('open', {}) // hmm, maybe wss was *already* open, so we need to kick it again?
 		} else { super.connectWebSocket(wss) }
