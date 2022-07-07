@@ -21,7 +21,10 @@
     "tsc": "tsc",
     "clean": "rm -f dist/*; rm -rf test/dist",
     "reserve": "date; npm run build; npm run cgserver",
-    "build": "npm run clean; npm run tsc"
+    "build": "npm run clean; npm run tsc",
+    "untarClient": "tar -x -C node_modules/@thegraid/wspbclient -f ../wspbclient/wspbclient.tar",
+    "tar": "npm run build; tar -cf wspbserver.tar README.md dist/* package.json",
+    "scp": "scp wspbserver.tar mac-mini:"
   },
   "repository": {
     "type": "git",
@@ -41,7 +44,7 @@
   "dependencies": {
     "@thegraid/common-lib": "^1.3.22",
     "@thegraid/ezpromise": "^1.0.10",
-    "@thegraid/wspbclient": "^1.4.21-w",
+    "@thegraid/wspbclient": "^1.4.22",
     "google-protobuf": "*",
     "tslib": "^2.1.0",
     "ws": "^8.8.0"

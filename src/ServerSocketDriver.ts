@@ -103,10 +103,10 @@ export class ServerSocketDriver<I extends pbMessage> extends WebSocketBase<I, I>
 	 * @param data DataBuf to be sent
 	 * @param cb provide specific function for 'onerror' [rare]
 	 */
-	sendBuffer(data: DataBuf<I>, cb?: (error: Event | Error) => void): void {
+	override sendBuffer(data: DataBuf<I>, cb?: (error: Event | Error) => void): void {
 		this.wss.send(data, cb); // server-side API (no 'options', undefined)
 	}
-  closeStream(code: CLOSE_CODE, reason: string): void {
+  override closeStream(code: CLOSE_CODE, reason: string): void {
     this.wss.close(code, reason)
   }
 }
