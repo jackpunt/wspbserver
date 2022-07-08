@@ -79,19 +79,17 @@ export class CgServerDriver extends CgBase<pbMessage> {
     this.ll(1) && listTCPsockets()
   }
 
+  /** the extant ClientGroup matching CgBase.group_name. */
+  group: ClientGroup;
+
   /** identify port before joined. 
    * @override client-only version in CgBase
    */
   override get client_port() { return this.client_id !== undefined ? this.client_id : this.remote_addr_port }
 
-  /** the extant ClientGroup matching CgBase.group_name. */
-  group: ClientGroup;
-
   /** pluck Remote info from ServerSocketBase of this stream. */
   get remote(): Remote { 
-    let dnstream = this.dnstream
-    while ((dnstream instanceof BaseDriver) && !(dnstream instanceof ServerSocketDriver)) { dnstream = dnstream.dnstream }
-    return (dnstream as ServerSocketDriver<any>).remote
+    return (this.wsbase as ServerSocketDriver<any>).remote
   }
   get remote_addr_port() {
     return `${this.remote.addr}:${this.remote.port}`
