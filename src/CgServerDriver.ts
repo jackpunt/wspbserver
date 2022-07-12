@@ -99,9 +99,9 @@ export class CgServerDriver extends CgBase<pbMessage> {
     // for server logs: return single-line string when able:
     let logData = super.logData(data) as { msgObj: {} | string, str?: string, imsg?: string | pbMessage }
     if (Object.keys(logData).length > 1) return logData  // <-- with embedded str&imsg
-    let msgObj = logData.msgObj
-    if (typeof msgObj === 'string') return msgObj // <-- the usual case
-    return json(msgObj)                           // <-- if super uses msg.msgObject(false)
+    let msgObj = logData.msgObj                   // extract msgObj and stringify it
+    if (typeof msgObj === 'string') return msgObj // <-- the usual case [already stringified]
+    return json(msgObj)                           // <-- if super uses msg.msgObject
   }
   override connectDnStream(dnstream: UpstreamDrivable<CgMessage>): this {
     super.connectDnStream(dnstream)
