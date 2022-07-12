@@ -45,7 +45,7 @@
   "dependencies": {
     "@thegraid/common-lib": "^1.3.22",
     "@thegraid/ezpromise": "^1.0.10",
-    "@thegraid/wspbclient": "file:../wspbclient/thegraid-wspbclient-1.4.24.tgz",
+    "@thegraid/wspbclient": "file:../wspbclient/thegraid-wspbclient-1.4.25.tgz",
     "google-protobuf": "*",
     "tslib": "^2.1.0",
     "ws": "^8.8.0"
