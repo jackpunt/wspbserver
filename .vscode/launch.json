@@ -5,7 +5,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "cgserver",
       //"outFiles": ["dist"],
@@ -17,7 +17,7 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "Jest run all tests",
       "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
@@ -26,7 +26,7 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "Jest run wss: tests",
       "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",
@@ -35,7 +35,7 @@
       "internalConsoleOptions": "neverOpen"
     },
     {
-      "type": "pwa-node",
+      "type": "node",
       "request": "launch",
       "name": "Jest run ns: tests",
       "program": "${workspaceRoot}/node_modules/jest/bin/jest.js",

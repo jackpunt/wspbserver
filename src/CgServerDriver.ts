@@ -37,7 +37,7 @@ class ClientGroup extends Map<number, CgServerDriver> {
     for (let [id, driver] of this) rv.push([id, driver.remote_addr_port])
     return rv;
   }
-  forEachMember(fn: (driver: CgServerDriver, id:number) => void) {
+  forEachMember(fn: (driver: CgServerDriver, client_id: number) => void) {
     this.forEach(fn);
   }
   getMember(client_id: number) {
@@ -296,7 +296,7 @@ export class CgServerDriver extends CgBase<pbMessage> {
       this.sendNak(`send failed: ${reason}`)
     }
 
-    let client_to = message.client_id    // if undefined send to 'all' of Group
+    let client_to = message.client_id    // if GROUP_ID send to 'all' of Group
     this.ll(1) && console.log(stime(this, ".eval_send:"), `${message.client_from} -> ${client_to === CgMessage.GROUP_ID ? 'GROUP_ID': client_to}`, this.innerMessageString(message), 'nocc:', message.nocc)
     if (client_to !== CgMessage.GROUP_ID) {
       // DM to specific client:
@@ -348,9 +348,9 @@ export class CgServerDriver extends CgBase<pbMessage> {
   }
   /** For CgType.send, the Ack from Referee can include a [CgType.send] message to be sent. */
   refMessage(orig: CgMessage, ack: CgMessage): CgMessage {
-    let msg = (ack.msg !== undefined) ? CgMessage.deserialize(ack.msg) : orig
-    this.ll(1) && console.log(stime(this, `.refMessage`), msg.msgString)
-    return msg
+    let msgToSend = (ack.has_msg) ? CgMessage.deserialize(ack.msg) : orig
+    this.ll(1) && console.log(stime(this, `.refMessage`), msgToSend.msgString)
+    return msgToSend
   }
 
   sendToReferee(msg: CgMessage) {
@@ -369,8 +369,8 @@ export class CgServerDriver extends CgBase<pbMessage> {
     // forward original message to all/other members of group
     let cc_sender = !message.nocc, n0 = (andRef || (this.isReferee && message.nocc === false)) ? 0 : 1
     let promises = Array<AckPromise>();
-    this.group && this.group.forEachMember((member, ndx) => {
-      if (ndx >= n0 && (cc_sender || (member !== this))) { // ndx==0 is the referee; TODO: other spectators (ndx<0)
+    this.group?.forEachMember((member, ndx) => {
+      if (ndx >= n0 && (cc_sender || (member !== this))) { // ndx==0 is the referee; TODO: other spectators (ndx>maxPlayers)
         let msgStr = this.innerMessageString(message), member_id = member.client_id
         this.ll(1) && console.log(stime(this, `.sendToMembers[${this.client_id}] ->`), { member_id, msgStr })
         promises.push(member.sendToSocket(message))
