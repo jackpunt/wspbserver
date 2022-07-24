@@ -1,4 +1,4 @@
-import { EzPromise } from "@thegraid/EzPromise";
+import { EzPromise } from "@thegraid/ezpromise";
 import { AnyWSD, pbMessage, stime } from "@thegraid/wspbclient";
 import * as dns from "dns";
 import * as fs from "fs";

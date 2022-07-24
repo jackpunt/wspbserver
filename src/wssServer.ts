@@ -2,7 +2,7 @@ import { argVal } from '@thegraid/common-lib'
 import { WSSOpts, WssListener, WSDriver } from './index.js';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
-export function srvrOpts(defHost = 'game7', defPort = '8447', k: string = '--'): WSSOpts {
+export function srvrOpts(defHost = 'game7', defPort = '8447', keydir='~/keys/', k: string = '--'): WSSOpts {
   const host = argVal('host', defHost, k)
   const portStr = argVal('port', defPort, k)
   const port = Number.parseInt(portStr)
@@ -11,7 +11,7 @@ export function srvrOpts(defHost = 'game7', defPort = '8447', k: string = '--'):
     host: host,
     domain: "thegraid.com",
     port: port,
-    keydir: "/Users/jpeck/keys/"
+    keydir: keydir
   }
 }
 /** return {cnlx, cnxlp, host, port, pid, srvropts} */
