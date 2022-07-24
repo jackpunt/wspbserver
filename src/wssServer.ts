@@ -2,17 +2,14 @@ import { argVal } from '@thegraid/common-lib'
 import { WSSOpts, WssListener, WSDriver } from './index.js';
 import { EzPromise, stime } from '@thegraid/wspbclient';
 
-export function srvrOpts(defHost = 'game7', defPort = '8447', keydir='~/keys/', k: string = '--'): WSSOpts {
+export function srvrOpts(defHost = 'game7', defPort = '8447', defKeys?: string, k: string = '--'): WSSOpts {
+  if (defKeys == undefined) defKeys = `${process.env.HOME}/keys/`
+  const keydir = argVal('keys', defKeys, k)
   const host = argVal('host', defHost, k)
   const portStr = argVal('port', defPort, k)
   const port = Number.parseInt(portStr)
-
-  return {
-    host: host,
-    domain: "thegraid.com",
-    port: port,
-    keydir: keydir
-  }
+  const domain = "thegraid.com"
+  return { host, domain, port, keydir }
 }
 /** return {cnlx, cnxlp, host, port, pid, srvropts} */
 export function wssServer(listenp: boolean | EzPromise<WssListener>, logName: string, srvropts: WSSOpts, ...drivers: WSDriver[]) {

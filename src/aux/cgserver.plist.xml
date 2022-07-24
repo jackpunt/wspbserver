@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- /Library/LaunchDaemons/com.thegraid.cgserver.plist -->
+<!-- sudo launchctl stop com.thegraid.cgserver -->
+<!-- sudo launchctl start com.thegraid.cgserver -->
+<!-- ~/bin/node node_modules/@thegraid/wspbserver/dist/cgserver.js - -lld1 0 -->
+<dict>
+    <key>Label</key>
+    <string>com.thegraid.cgserver</string>
+
+    <key>Username</key><string>jpeck</string>
+
+    <key>ProgramArguments</key>
+    <array>
+	<string>/Users/jpeck/bin/cgserver</string>
+        <!-- <string>/Users/jpeck/bin/node</string> -->
+        <!-- <string>dist/cgserver.js</string> -->
+        <!-- <string>&#45;-host</string> -->
+        <!-- <string>game4</string> -->
+    </array>
+
+    <key>WorkingDirectory</key><string>/Users/jpeck</string>
+
+    <key>RunAtLoad</key><false/>
+    <key>KeepAlive</key><dict> <key>SuccessfulExit</key> <true/> </dict>
+    <key>StandardOutPath</key><string>/tmp/cgserver.out</string>
+    <key>StandardErrorPath</key><string>/tmp/cgserver.err</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NODE_EXTRA_CA_CERTS</key><string>/Users/jpeck/keys/node_extra_ca_certs</string>
+    </dict>
+    <key>ProcessType</key><string>Interactive</string>
+
+</dict>
+</plist>

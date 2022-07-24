@@ -4,7 +4,7 @@ import { Server as HttpsServer } from "https";
 import { CgServerDriver, srvrOpts, startListening, WssListener, wssServer } from "../src/index.js";
 
 // jest will NOT pass useful args to test file
-let srvropts = srvrOpts('game6', '8443', '=')
+let srvropts = srvrOpts('game6', '8443', undefined, '=')
 let isListening = new EzPromise<WssListener>()
 let info = wssServer(isListening, 'testListen', srvropts, CgServerDriver ) // NOT startListening()
 let cnxl = info.cnxl

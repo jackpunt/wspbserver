@@ -7,4 +7,4 @@ let lld1 = Number.parseInt(argVal('lld1', '1'))
 ServerSocketDriver.logLevel = lld0
 CgServerDriver.logLevel = lld1
 
-wssServer(true, 'cgserver', srvrOpts('game7', '8447'), CgServerDriver)
+wssServer(true, 'cgserver', srvrOpts('cgserver', '8447'), CgServerDriver)
