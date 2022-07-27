@@ -187,14 +187,28 @@ export class CgServerDriver extends CgBase<pbMessage> {
    * QQQQ: should 'join' requests be moderated by client_0 ? (to verify passcode or whatever)
    */
   override eval_join(message: CgMessage): void {
-    if (this.group !== undefined) {
-      // Maybe someday support an array of group names... ? to multiplex the client-server cnx
-      // No: demux at a higher level
-      this.sendNak("already in group", { group: this.group.name })
-      return
+    let join_name = this.group?.name
+    let reject = (msg) => { this.sendNak(msg, { group: join_name }) }
+
+    if (this.group !== undefined) return reject("already in group")
+    join_name = message.group
+    if (join_name.length < 2) return reject("invalid group name")
+
+    let group = CgServerDriver.cGroups.get(join_name);
+    let fnew = (message.cause == 'new'), sep = '_'
+    this.ll(1) && console.log(stime(this, `.eval_join:`), { fnew, join_name, group: !!group, message: message.msgString })
+    if (fnew && group) {
+      if (join_name.includes(sep)) return reject("invalid base name")
+      let base_name = join_name, suf = Math.floor(Math.random()*35), mod = 100, nc = 1, gmax = 4
+      do {
+        if (++nc >= mod) mod *= 10
+        if (nc > gmax) return reject('server max')
+        let suffix = mod % (suf + 17)
+        join_name = `${base_name}${sep}${suffix}`
+        group = CgServerDriver.cGroups.get(join_name);
+        this.ll(2) && console.log(stime(this, `.eval_join: fnew`), { fnew, join_name, group })
+      } while (group)
     }
-    const join_name = message.group
-    let group = CgServerDriver.cGroups.get(join_name)
     if (!group) {
       // create/register the group, recruit a Referee:
       group = new ClientGroup(join_name)
@@ -204,10 +218,9 @@ export class CgServerDriver extends CgBase<pbMessage> {
     }
     let isAutoAck = !group.referee || (group.referee instanceof CgAutoAckDriver)
     let cause = isAutoAck ? "auto-approve" : "ref-approved"
-    if (this.isRefereeJoin(message)) { 
+    if (this.isRefereeJoin(message)) {
       if (!isAutoAck && (group.referee instanceof CgServerDriver)) {
-       this.sendNak('referee exists', {group: join_name}) // TODO: send refJoin msg to existing Ref to handle
-       return
+        return reject('referee exists')
       } 
       cause = (this instanceof CgAutoAckDriver) ? 'auto-referee' : 'real-referee' 
       // Note: we don't 'kick' the auto-ref, we just over-write it in the Group:
@@ -216,7 +229,7 @@ export class CgServerDriver extends CgBase<pbMessage> {
     } else { 
       group.addMember(this) // this.group=group
     }
-    this.ll(1) && console.log(stime(this, ".eval_join"), {group: group.members, remote: this.remote_addr_port})
+    this.ll(1) && console.log(stime(this, ".eval_join"), { members: group.members, remote: this.remote_addr_port })
     this.sendAck(cause, { client_id: this.client_id, group: join_name })
     return
   }

@@ -10,8 +10,8 @@
   "scripts": {
     "pub": "npm version ${1:-patch}; npm run build; npm publish --access public",
     "echo": "node dist/echoserver.js",
-    "cgserver": "node dist/cgserver.js",
-    "Note0": "npm run cgserver -- --host game6 --port 8445",
+    "cgserver": "node dist/cgserver.js -- --host game5",
+    "Note0": "npm run cgserver -- --host game5 --port 8447",
     "testns": "jest --runInBand --detectOpenHandles --testPathIgnorePatterns=wspbserver.spec",
     "testwss": "jest --runInBand  --detectOpenHandles --verbose -t 'wss:'",
     "test": "jest --runInBand  --detectOpenHandles --verbose spec.ts",
